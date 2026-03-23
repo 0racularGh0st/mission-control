@@ -1,51 +1,83 @@
 {
   "todo": [
     {
-      "id": "t-design-system-001",
-      "title": "Design system: foundations",
-      "description": "Create a mission-control design system (colors, typography, spacing, tokens) and implement a ThemeProvider in the app.",
-      "acceptance": [
-        "Color tokens added (accent, background, surface, muted)",
-        "Typography tokens and base font loaded (Inter)",
-        "ThemeProvider applies tokens site-wide and supports dark/light"
-      ],
+      "id": "ds-0001",
+      "title": "Design system: tokens & theme",
+      "description": "Create color tokens, typography scale, spacing system, and implement ThemeProvider + Tailwind token mapping.",
+      "acceptance": ["Color tokens (accent, surface, bg, muted) in tailwind.config","Typography scale in CSS vars","Theme switcher that updates site tokens"],
       "assignee": "Cody",
       "status": "todo"
     },
     {
-      "id": "t-ui-cards-001",
-      "title": "Polish UI cards component",
-      "description": "Create a reusable Card component (surface, shadow, padding) and replace existing ad-hoc card markup on Dashboard/Tasks/Office.",
-      "acceptance": [
-        "Card component available in /components and used in Dashboard, Tasks, Office",
-        "Matches Jarvis theme (glass gradient, subtle neon accent)",
-        "Accessible (role=region, aria-label where applicable)"
-      ],
+      "id": "cmp-0001",
+      "title": "Component library: Card, Panel, Button, Badge",
+      "description": "Build reusable components (accessible) with props for variants and sizes.",
+      "acceptance": ["Components available under /components/ui","Storybook stories or demo pages","Used across Dashboard/Tasks/Office"],
       "assignee": "Cody",
       "status": "todo"
     },
     {
-      "id": "t-tasks-ui-001",
-      "title": "Tasks board visual upgrade",
-      "description": "Improve the Tasks board: nicer cards, headers, drag handles, assignee badges, and responsive layout.",
-      "acceptance": [
-        "Cards show title, assignee badge, and hover actions",
-        "Drag handle visible and works on desktop/touch",
-        "Board responsive to smaller screens"
-      ],
+      "id": "cmd-0001",
+      "title": "Top Command Bar (Cmd+K)",
+      "description": "Implement Raycast-like command palette with intent parsing, suggestions, and agent routing.",
+      "acceptance": ["Cmd+K toggles palette","Suggest agents and actions","Submit routes a command to /api/cody (Jarvis)"],
       "assignee": "Cody",
       "status": "todo"
     },
     {
-      "id": "t-palette-001",
-      "title": "Command palette (design + integration)",
-      "description": "Design and implement a command palette component (invoked by Cmd+K) that routes commands to Jarvis/Cody and displays results inline.",
-      "acceptance": [
-        "Palette opens with Cmd+K and focuses input",
-        "Sends prompt to /api/cody and displays streaming response or final result",
-        "Keyboard accessible navigation of suggestions"
-      ],
+      "id": "ui-0001",
+      "title": "Dashboard layout: Main + Inspector + Sidebar",
+      "description": "Implement the 3-column layout: left sidebar, main dashboard, right inspector. Ensure responsive resizing and modular panels.",
+      "acceptance": ["Sidebar navigation works","Inspector shows agent details","Panels are draggable/resizable (basic)"],
       "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "agent-0001",
+      "title": "Agent widget and controls",
+      "description": "Create Agent card showing name/role/status/model/cost with start/stop/reassign prompt inline editing.",
+      "acceptance": ["Agent cards show required fields","Controls trigger API endpoints","Cost and token metrics displayed"],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "route-0001",
+      "title": "Model routing visualization",
+      "description": "Create visual flow for routing (Input → Router → Model → Output) including explanation why model chosen and token/cost metrics.",
+      "acceptance": ["Visual flow per task","Show model, reason, tokens, cost"],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "logs-0001",
+      "title": "Real-time logs stream",
+      "description": "Implement SSE/WebSocket logs stream, filter UI, and full trace view with error highlighting.",
+      "acceptance": ["Logs stream via WebSocket","Filter by agent","Expand to full trace"],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "cost-0001",
+      "title": "Cost & token tracking widgets",
+      "description": "Add dashboard widgets for spend (today / month), cost per agent, tokens used and cost per task.",
+      "acceptance": ["Widgets with real sample data","Per-agent breakdown"],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "memory-0001",
+      "title": "Memory inspector and editor",
+      "description": "UI to browse stored memory, edit entries, tag, and link to agents.",
+      "acceptance": ["List by day","Edit and tag entries","Link entry to agent context"],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "qa-0001",
+      "title": "QA: Sandra Playwright tests",
+      "description": "Create Playwright test suite: load app, open Tasks, verify cards, command bar, agent controls and visual snapshot matching Jarvis theme.",
+      "acceptance": ["Playwright tests run locally","Screenshots saved","Fails if visual difference > threshold"],
+      "assignee": "Sandra",
       "status": "todo"
     }
   ],
