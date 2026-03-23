@@ -1,5 +1,7 @@
 "use client"
-import {useState} from 'react'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client"
+import {useState, useEffect} from 'react'
 import {
   DndContext,
   closestCenter,
@@ -24,9 +26,9 @@ function Card({id, title, assignee}:{id:string,title:string,assignee:string}){
 }
 
 export default function TasksBoard(){
-  const [todo, setTodo] = useState([])
-  const [doing, setDoing] = useState([])
-  const [done, setDone] = useState([])
+  const [todo, setTodo] = useState<any[]>([])
+  const [doing, setDoing] = useState<any[]>([])
+  const [done, setDone] = useState<any[]>([])
 
   useEffect(()=>{
     fetch('/api/tasks').then(r=>r.json()).then(j=>{

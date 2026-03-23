@@ -2,22 +2,24 @@
 import {useEffect, useState} from 'react'
 
 export default function ThemeToggle(){
-  const [light, setLight] = useState(false)
+  // lazy initializer reads localStorage on first render (client-only)
+  const [light, setLight] = useState(()=>{
+    try{ return localStorage.getItem('mc-theme') === 'light' }catch(e){ return false }
+  })
+
   useEffect(()=>{
-    const saved = localStorage.getItem('mc-theme')
-    if(saved==='light') setLight(true)
-    else setLight(false)
-  },[])
-  useEffect(()=>{
-    if(light){
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('mc-theme','light')
-    } else {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('mc-theme','dark')
-    }
+    try{
+      if(light){
+        document.documentElement.classList.remove('dark')
+        localStorage.setItem('mc-theme','light')
+      } else {
+        document.documentElement.classList.add('dark')
+        localStorage.setItem('mc-theme','dark')
+      }
+    }catch(e){}
   },[light])
+
   return (
-    <button onClick={()=>setLight(!light)} className="px-3 py-1 bg-gray-700 rounded text-sm">{light? 'Light' : 'Dark'}</button>
+    <button onClick={()=>setLight(prev=>!prev)} className="px-3 py-1 bg-gray-700 rounded text-sm">{light? 'Light' : 'Dark'}</button>
   )
 }
