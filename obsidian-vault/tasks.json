@@ -1,0 +1,54 @@
+{
+  "todo": [
+    {
+      "id": "t-design-system-001",
+      "title": "Design system: foundations",
+      "description": "Create a mission-control design system (colors, typography, spacing, tokens) and implement a ThemeProvider in the app.",
+      "acceptance": [
+        "Color tokens added (accent, background, surface, muted)",
+        "Typography tokens and base font loaded (Inter)",
+        "ThemeProvider applies tokens site-wide and supports dark/light"
+      ],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "t-ui-cards-001",
+      "title": "Polish UI cards component",
+      "description": "Create a reusable Card component (surface, shadow, padding) and replace existing ad-hoc card markup on Dashboard/Tasks/Office.",
+      "acceptance": [
+        "Card component available in /components and used in Dashboard, Tasks, Office",
+        "Matches Jarvis theme (glass gradient, subtle neon accent)",
+        "Accessible (role=region, aria-label where applicable)"
+      ],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "t-tasks-ui-001",
+      "title": "Tasks board visual upgrade",
+      "description": "Improve the Tasks board: nicer cards, headers, drag handles, assignee badges, and responsive layout.",
+      "acceptance": [
+        "Cards show title, assignee badge, and hover actions",
+        "Drag handle visible and works on desktop/touch",
+        "Board responsive to smaller screens"
+      ],
+      "assignee": "Cody",
+      "status": "todo"
+    },
+    {
+      "id": "t-palette-001",
+      "title": "Command palette (design + integration)",
+      "description": "Design and implement a command palette component (invoked by Cmd+K) that routes commands to Jarvis/Cody and displays results inline.",
+      "acceptance": [
+        "Palette opens with Cmd+K and focuses input",
+        "Sends prompt to /api/cody and displays streaming response or final result",
+        "Keyboard accessible navigation of suggestions"
+      ],
+      "assignee": "Cody",
+      "status": "todo"
+    }
+  ],
+  "doing": [],
+  "done": []
+}
