@@ -1,39 +1,31 @@
-"use client"
-import React, {createContext, useContext, useEffect, useState} from 'react'
+use client
 
-type Theme = 'light'|'dark'|'system'
-const STORAGE_KEY = 'mc:theme'
+import { ReactNode, useEffect, useState } from 'react'
 
-const ThemeContext = createContext<{theme:Theme,setTheme:(t:Theme)=>void,toggle:()=>void}|undefined>(undefined)
-
-export const ThemeProvider:React.FC<{children:React.ReactNode}> = ({children})=>{
-  const [theme,setThemeState] = useState<Theme>(()=>{
-    try{ const s = localStorage.getItem(STORAGE_KEY) as Theme|null; return s||'system' }catch(e){ return 'system' }
+export function ThemeProvider({ children }: { children: ReactNode }){
+  const [theme, setTheme] = useState<'light'|'dark'>(() => {
+    try{
+      const stored = localStorage.getItem('theme')
+      if (stored === 'dark') return 'dark'
+    }catch(e){}
+    return 'light'
   })
 
-  useEffect(()=>{
-    const apply = (t:Theme)=>{
-      let resolved = t
-      if(t==='system'){
-        const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-        resolved = prefersDark? 'dark':'light'
-      }
-      document.documentElement.setAttribute('data-theme', resolved)
-    }
-    apply(theme)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light')
+    try{ localStorage.setItem('theme', theme) }catch(e){}
   },[theme])
 
-  const setTheme = (t:Theme) =>{
-    try{ localStorage.setItem(STORAGE_KEY,t) }catch(e){}
-    setThemeState(t)
-  }
-  const toggle = ()=> setTheme(theme==='dark'?'light':'dark')
-
-  return <ThemeContext.Provider value={{theme,setTheme,toggle}}>{children}</ThemeContext.Provider>
-}
-
-export const useTheme = ()=>{
-  const ctx = useContext(ThemeContext)
-  if(!ctx) throw new Error('useTheme must be used inside ThemeProvider')
-  return ctx
+  return (
+    <div>
+      <button
+        aria-label="Toggle theme"
+        onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+        className="sr-only"
+      >
+        Toggle theme
+      </button>
+      {children}
+    </div>
+  )
 }

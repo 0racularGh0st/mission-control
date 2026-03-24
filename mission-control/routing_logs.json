@@ -1,0 +1,59 @@
+[
+  {
+    "task": "Summarize text",
+    "task_id": "t1",
+    "category": "cheap",
+    "model_used": "gpt-5-mini",
+    "success": true,
+    "quality_score": 7,
+    "retry_count": 0,
+    "final_model": "gpt-5-mini",
+    "cost": 0.1366,
+    "latency_ms": 270,
+    "timestamp": "2026-03-24T04:17:09.987Z",
+    "features": {
+      "id": "t1",
+      "type": "chat",
+      "text": "Summarize text",
+      "complexity": "low"
+    }
+  },
+  {
+    "task": "Explain X",
+    "task_id": "t2",
+    "category": "mid",
+    "model_used": "gpt-5",
+    "success": true,
+    "quality_score": 7,
+    "retry_count": 0,
+    "final_model": "gpt-5",
+    "cost": 0.045,
+    "latency_ms": 878,
+    "timestamp": "2026-03-24T04:17:09.992Z",
+    "features": {
+      "id": "t2",
+      "type": "research",
+      "text": "Explain X",
+      "complexity": "medium"
+    }
+  },
+  {
+    "task": "Implement multi-file",
+    "task_id": "t3",
+    "category": "heavy",
+    "model_used": "gpt-5.2-codex",
+    "success": true,
+    "quality_score": 8,
+    "retry_count": 0,
+    "final_model": "gpt-5.2-codex",
+    "cost": 0.546,
+    "latency_ms": 800,
+    "timestamp": "2026-03-24T04:17:09.993Z",
+    "features": {
+      "id": "t3",
+      "type": "code",
+      "text": "Implement multi-file",
+      "complexity": "high"
+    }
+  }
+]
