@@ -1,3 +1,5 @@
+export type RuntimeSource = "mock" | "local";
+
 export type AgentHealth = "healthy" | "busy" | "degraded";
 
 export interface ActiveAgentDto {
@@ -54,11 +56,27 @@ export interface RuntimeLogEntryDto {
 
 export interface DashboardSnapshotDto {
   generatedAtIso: string;
-  source: "mock" | "runtime-api" | "runtime-sse";
+  source: "mock" | "local-api" | "local-sse";
   activeAgents: ActiveAgentDto[];
   queueSnapshot: TaskQueueLaneDto[];
   alerts: RuntimeAlertDto[];
   tokenCostSummary: TokenCostSummaryDto;
   modelRouting: ModelRoutingEntryDto[];
   recentLogs: RuntimeLogEntryDto[];
+}
+
+export interface DashboardIncrementalPatchDto {
+  cursor: string;
+  logs?: RuntimeLogEntryDto[];
+}
+
+export interface DashboardRuntimeStateDto {
+  transport: "poll" | "sse";
+  source: RuntimeSource;
+  cursor: string;
+  recommendedPollMs: number;
+  incrementalSupported: boolean;
+  ssePath?: string;
+  snapshot: DashboardSnapshotDto;
+  updates: DashboardIncrementalPatchDto[];
 }

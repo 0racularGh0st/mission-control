@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { getDashboardSnapshot } from "@/src/runtime/dashboard/adapters";
+import { getDashboardRuntimeState } from "@/src/runtime/dashboard/adapters";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const snapshot = await getDashboardSnapshot();
-    return NextResponse.json(snapshot, { status: 200 });
+    const { searchParams } = new URL(request.url);
+    const cursor = searchParams.get("cursor") ?? undefined;
+
+    const runtimeState = await getDashboardRuntimeState(cursor);
+    return NextResponse.json(runtimeState, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       {

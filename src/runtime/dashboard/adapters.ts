@@ -1,7 +1,19 @@
-import type { DashboardSnapshotDto } from "./types";
+import type {
+  DashboardIncrementalPatchDto,
+  DashboardRuntimeStateDto,
+  DashboardSnapshotDto,
+  RuntimeLogEntryDto,
+  RuntimeSource,
+} from "./types";
 
 interface DashboardRuntimeAdapter {
   getSnapshot(): Promise<DashboardSnapshotDto>;
+  getRuntimeState(cursor?: string): Promise<DashboardRuntimeStateDto>;
+}
+
+interface DashboardLocalTransport {
+  readSnapshot(): Promise<DashboardSnapshotDto>;
+  readUpdates(cursor?: string): Promise<DashboardIncrementalPatchDto[]>;
 }
 
 const now = new Date();
@@ -58,39 +70,130 @@ const mockSnapshot: DashboardSnapshotDto = {
   ],
 };
 
+function createCursor(date = new Date()) {
+  return `ts_${date.toISOString()}`;
+}
+
+function attachTime(snapshot: DashboardSnapshotDto, source: DashboardSnapshotDto["source"]): DashboardSnapshotDto {
+  const generatedAtIso = new Date().toISOString();
+  const recentLogs = snapshot.recentLogs.map((entry, index): RuntimeLogEntryDto => ({
+    ...entry,
+    id: `${entry.id}-${index}`,
+    createdAtIso: generatedAtIso,
+  }));
+
+  return {
+    ...snapshot,
+    source,
+    generatedAtIso,
+    recentLogs,
+  };
+}
+
 class MockDashboardAdapter implements DashboardRuntimeAdapter {
   async getSnapshot(): Promise<DashboardSnapshotDto> {
+    return attachTime(mockSnapshot, "mock");
+  }
+
+  async getRuntimeState(cursor?: string): Promise<DashboardRuntimeStateDto> {
+    void cursor;
     return {
-      ...mockSnapshot,
-      generatedAtIso: new Date().toISOString(),
+      transport: "poll",
+      source: "mock",
+      cursor: createCursor(),
+      recommendedPollMs: 5_000,
+      incrementalSupported: false,
+      snapshot: await this.getSnapshot(),
+      updates: [],
     };
   }
 }
 
-/**
- * Runtime API/SSE adapter placeholder.
- * Swap in real fetch/SSE hydration when runtime transport is ready.
- */
-class RuntimeDashboardAdapter implements DashboardRuntimeAdapter {
+class LocalDashboardTransport implements DashboardLocalTransport {
+  async readSnapshot(): Promise<DashboardSnapshotDto> {
+    return attachTime(mockSnapshot, "local-api");
+  }
+
+  async readUpdates(cursor?: string): Promise<DashboardIncrementalPatchDto[]> {
+    if (!cursor) {
+      return [];
+    }
+
+    return [
+      {
+        cursor: createCursor(),
+        logs: [
+          {
+            id: "log-update-1",
+            message: "Local transport boundary is active; incremental payload shape reserved for runtime feed.",
+            createdAtIso: new Date().toISOString(),
+          },
+        ],
+      },
+    ];
+  }
+}
+
+class LocalDashboardAdapter implements DashboardRuntimeAdapter {
+  constructor(private readonly transport: DashboardLocalTransport = new LocalDashboardTransport()) {}
+
   async getSnapshot(): Promise<DashboardSnapshotDto> {
+    return this.transport.readSnapshot();
+  }
+
+  async getRuntimeState(cursor?: string): Promise<DashboardRuntimeStateDto> {
+    const snapshot = await this.getSnapshot();
+
     return {
-      ...(await new MockDashboardAdapter().getSnapshot()),
-      source: "runtime-api",
+      transport: "poll",
+      source: "local",
+      cursor: createCursor(),
+      recommendedPollMs: 2_000,
+      incrementalSupported: true,
+      ssePath: "/api/runtime/dashboard/stream",
+      snapshot,
+      updates: await this.transport.readUpdates(cursor),
     };
   }
 }
 
-function shouldUseRuntimeAdapter() {
-  return process.env.MISSION_CONTROL_RUNTIME_SOURCE === "runtime";
+function resolveRuntimeSource(): RuntimeSource {
+  const value = process.env.MISSION_CONTROL_RUNTIME_SOURCE;
+  return value === "local" ? "local" : "mock";
 }
 
 export function getDashboardAdapter(): DashboardRuntimeAdapter {
-  if (shouldUseRuntimeAdapter()) {
-    return new RuntimeDashboardAdapter();
+  const source = resolveRuntimeSource();
+  if (source === "local") {
+    return new LocalDashboardAdapter();
   }
   return new MockDashboardAdapter();
 }
 
 export async function getDashboardSnapshot() {
-  return getDashboardAdapter().getSnapshot();
+  const adapter = getDashboardAdapter();
+
+  if (resolveRuntimeSource() !== "local") {
+    return adapter.getSnapshot();
+  }
+
+  try {
+    return await adapter.getSnapshot();
+  } catch {
+    return new MockDashboardAdapter().getSnapshot();
+  }
+}
+
+export async function getDashboardRuntimeState(cursor?: string) {
+  const adapter = getDashboardAdapter();
+
+  if (resolveRuntimeSource() !== "local") {
+    return adapter.getRuntimeState(cursor);
+  }
+
+  try {
+    return await adapter.getRuntimeState(cursor);
+  } catch {
+    return new MockDashboardAdapter().getRuntimeState(cursor);
+  }
 }
