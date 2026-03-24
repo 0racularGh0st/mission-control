@@ -1,0 +1,48 @@
+{
+  "router": {
+    "model": "openai/gpt-5.4",
+    "temperature": 0.2,
+    "system_prompt": "You are a routing AI. Your job is to choose the cheapest model that can successfully complete the task. Never choose expensive models unless necessary."
+  },
+  "routes": [
+    {
+      "name": "cheap_tasks",
+      "model": "openai/gpt-5.4-nano",
+      "alternates": ["openai/gpt-5.4-mini"],
+      "conditions": ["simple questions","summarization","formatting","basic code","chat","short responses"]
+    },
+    {
+      "name": "mid_tasks",
+      "model": "openai/gpt-5.4",
+      "conditions": ["multi-step reasoning","moderate coding","planning","agent coordination","longer outputs"]
+    },
+    {
+      "name": "heavy_tasks",
+      "model": "openai/gpt-5.3-codex",
+      "reasoning": "high",
+      "conditions": ["multi-file code edits","debugging complex errors","refactoring","large codebases","tool usage","agent stuck retries"]
+    }
+  ],
+  "fallbacks": [
+    { "from": "openai/gpt-5.4-nano", "to": "openai/gpt-5.4-mini", "on": ["failure","low confidence","incomplete output"] },
+    { "from": "openai/gpt-5.4-mini", "to": "openai/gpt-5.4", "on": ["failure","low confidence","incomplete output"] },
+    { "from": "openai/gpt-5.4", "to": "openai/gpt-5.3-codex", "on": ["code failure","complex reasoning failure"] }
+  ],
+  "budget": {
+    "max_cost_per_task": 0.30,
+    "max_daily_cost": 5.00,
+    "codex_usage_limit_percent": 20
+  },
+  "rules": [
+    "Never use codex for simple prompts",
+    "Try gpt-5.4-nano or gpt-5.4-mini at least once before escalation",
+    "Limit codex to max 2 retries per task"
+  ],
+  "intents": {
+    "chat": "openai/gpt-5.4-nano",
+    "research": "openai/gpt-5.4",
+    "code_simple": "openai/gpt-5.4-mini",
+    "code_complex": "openai/gpt-5.3-codex",
+    "debugging": "openai/gpt-5.3-codex"
+  }
+}
