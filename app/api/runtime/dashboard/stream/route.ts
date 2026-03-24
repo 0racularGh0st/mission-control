@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  let cursor = searchParams.get("cursor") ?? undefined;
+  let cursor = searchParams.get("cursor") ?? request.headers.get("last-event-id") ?? undefined;
 
   const encoder = new TextEncoder();
 
@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     start(controller) {
       let closed = false;
       let inflight = false;
+      let sentInitialSnapshot = false;
 
       const sendRuntimeEvent = async () => {
         if (closed || inflight) {
@@ -21,8 +22,41 @@ export async function GET(request: Request) {
         inflight = true;
         try {
           const runtimeState = await getDashboardRuntimeState(cursor);
+
+          if (!sentInitialSnapshot) {
+            sentInitialSnapshot = true;
+            controller.enqueue(
+              encoder.encode(
+                `id: ${runtimeState.cursor}\nevent: snapshot\ndata: ${JSON.stringify({
+                  cursor: runtimeState.cursor,
+                  source: runtimeState.source,
+                  transport: runtimeState.transport,
+                  snapshot: runtimeState.snapshot,
+                })}\n\n`,
+              ),
+            );
+          }
+
+          if (runtimeState.updates.length > 0) {
+            for (const patch of runtimeState.updates) {
+              controller.enqueue(
+                encoder.encode(`id: ${patch.cursor}\nevent: patch\ndata: ${JSON.stringify(patch)}\n\n`),
+              );
+            }
+          } else {
+            controller.enqueue(
+              encoder.encode(
+                `id: ${runtimeState.cursor}\nevent: runtime\ndata: ${JSON.stringify({
+                  cursor: runtimeState.cursor,
+                  source: runtimeState.source,
+                  transport: runtimeState.transport,
+                  recommendedPollMs: runtimeState.recommendedPollMs,
+                })}\n\n`,
+              ),
+            );
+          }
+
           cursor = runtimeState.cursor;
-          controller.enqueue(encoder.encode(`event: runtime\ndata: ${JSON.stringify(runtimeState)}\n\n`));
         } catch (error) {
           controller.enqueue(
             encoder.encode(

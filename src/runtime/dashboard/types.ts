@@ -65,9 +65,15 @@ export interface DashboardSnapshotDto {
   recentLogs: RuntimeLogEntryDto[];
 }
 
+export type DashboardPatchType = "log.append" | "alert.upsert" | "queue.lane";
+
 export interface DashboardIncrementalPatchDto {
   cursor: string;
+  type: DashboardPatchType;
+  emittedAtIso: string;
   logs?: RuntimeLogEntryDto[];
+  alert?: RuntimeAlertDto;
+  queueLane?: TaskQueueLaneDto;
 }
 
 export interface DashboardRuntimeStateDto {
