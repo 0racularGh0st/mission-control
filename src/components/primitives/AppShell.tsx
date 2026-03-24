@@ -12,6 +12,7 @@ const navItems = [
   { label: "Models", href: "/models" },
   { label: "Agents", href: "/agents" },
   { label: "Tasks", href: "/tasks" },
+  { label: "Automations", href: "/automations" },
   { label: "Logs", href: "/logs" },
   { label: "Memory", href: "/memory" },
   { label: "Costs", href: "/costs" },
