@@ -1,0 +1,1 @@
+npm run purge && npm run lint && npm run tsc-lint
