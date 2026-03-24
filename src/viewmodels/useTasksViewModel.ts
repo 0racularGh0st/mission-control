@@ -1,21 +1,10 @@
 import { useMemo } from "react";
-
 import type { DashboardSnapshotDto, TaskQueueLaneDto } from "@/src/runtime/dashboard/types";
+import type { Task, TaskLane } from "@/src/runtime/tasks/store";
 
-export interface TaskCardViewModel {
-  id: string;
-  title: string;
-  lane: string;
+export interface TaskCardViewModel extends Task {
   laneLabel: string;
-  status: string;
-  assignee: string;
-  priority: "P0" | "P1" | "P2" | "P3";
-  updatedAtLabel: string;
   etaLabel: string;
-  summary: string;
-  detail: string;
-  blockingReason?: string;
-  model: string;
 }
 
 export interface TaskLaneViewModel extends TaskQueueLaneDto {
@@ -34,107 +23,38 @@ function formatEta(minutes: number | null) {
   return minutes == null ? "unknown" : `~${minutes}m`;
 }
 
-function formatRelativeTime(minutesAgo: number) {
-  if (minutesAgo <= 1) return "1m ago";
-  return `${minutesAgo}m ago`;
-}
+const laneLabels: Record<TaskLane, string> = {
+  now: "NOW",
+  next: "NEXT",
+  review: "REVIEW",
+  blocked: "BLOCKED",
+  done: "DONE",
+};
 
-const taskSeed: Omit<TaskCardViewModel, "lane" | "laneLabel">[] = [
-  {
-    id: "T-584",
-    title: "Promote scheduler pulse to NOW lane",
-    status: "in progress",
-    assignee: "Planner",
-    priority: "P1",
-    updatedAtLabel: formatRelativeTime(4),
-    etaLabel: "~12m",
-    summary: "A fresh runtime pulse was detected and is being normalized into the active queue.",
-    detail: "Scheduler reconciles stale tasks, reorders lane depth, and emits a new runtime cursor once the queue state settles.",
-    model: "gpt-5.4",
-  },
-  {
-    id: "T-571",
-    title: "Unstick ops worker session",
-    status: "blocked",
-    assignee: "Ops",
-    priority: "P0",
-    updatedAtLabel: formatRelativeTime(11),
-    etaLabel: "unknown",
-    summary: "A worker has missed several heartbeats and needs manual confirmation.",
-    detail: "The task is waiting on a restarted local transport session before it can be safely retried.",
-    blockingReason: "No heartbeat for 11m on ops lane.",
-    model: "o3",
-  },
-  {
-    id: "T-612",
-    title: "Review ticket 4 merge",
-    status: "awaiting review",
-    assignee: "Coder",
-    priority: "P2",
-    updatedAtLabel: formatRelativeTime(18),
-    etaLabel: "~9m",
-    summary: "Merged work is queued for lint/build confirmation before it can be promoted.",
-    detail: "The review card is holding the line until the build remains green and the shell is validated on the Tasks page.",
-    model: "gpt-5.3-codex",
-  },
-  {
-    id: "T-618",
-    title: "Refresh routing fallback policy",
-    status: "queued",
-    assignee: "Research",
-    priority: "P3",
-    updatedAtLabel: formatRelativeTime(27),
-    etaLabel: "~31m",
-    summary: "Model share is being rebalanced after a fallback spike.",
-    detail: "This task watches the router and prepares a safer default when high-latency models trend upward.",
-    model: "gpt-4.1",
-  },
-  {
-    id: "T-601",
-    title: "Finalize cost watch alert",
-    status: "done",
-    assignee: "Planner",
-    priority: "P2",
-    updatedAtLabel: formatRelativeTime(42),
-    etaLabel: "done",
-    summary: "Budget guardrails were confirmed and the alert was dismissed.",
-    detail: "Historical spend is now visible in the dashboard and the cost threshold is tracked via runtime metrics.",
-    model: "gpt-5.4",
-  },
-];
-
-function taskForLane(lane: TaskQueueLaneDto, index: number): TaskCardViewModel[] {
-  const items = taskSeed.filter((task) => {
-    if (lane.lane === "now") return ["in progress", "queued"].includes(task.status);
-    if (lane.lane === "next") return ["queued"].includes(task.status);
-    if (lane.lane === "blocked") return task.status === "blocked";
-    return ["awaiting review", "done"].includes(task.status);
-  });
-
-  return items.map((task, taskIndex) => ({
+function taskToCard(task: Task): TaskCardViewModel {
+  return {
     ...task,
-    lane: lane.lane,
-    laneLabel: lane.label,
-    updatedAtLabel: task.updatedAtLabel,
-    summary: task.summary,
-    detail: task.detail,
-    title: task.title,
-    id: `${task.id}-${index}-${taskIndex}`,
-  }));
+    laneLabel: laneLabels[task.lane] ?? task.lane.toUpperCase(),
+    etaLabel: formatEta(task.etaMinutes),
+  };
 }
 
-export function useTasksViewModel(snapshot: DashboardSnapshotDto) {
+export function useTasksViewModel(snapshot: DashboardSnapshotDto, liveTasks?: Task[]) {
   return useMemo(() => {
-    const lanes: TaskLaneViewModel[] = snapshot.queueSnapshot.map((lane) => ({
+    // Prefer live tasks from API; fall back to snapshot-seeded mock
+    const tasks: Task[] = liveTasks && liveTasks.length > 0 ? liveTasks : buildSeedTasks();
+
+    const cards = tasks.map(taskToCard);
+
+    const lanes: TaskLaneViewModel[] = (snapshot.queueSnapshot.length > 0 ? snapshot.queueSnapshot : buildLanesFromTasks(tasks)).map((lane) => ({
       ...lane,
       countLabel: String(lane.count),
       etaLabel: formatEta(lane.etaMinutes),
     }));
 
-    const cards = snapshot.queueSnapshot.flatMap((lane, index) => taskForLane(lane, index));
-    const blocked = snapshot.queueSnapshot.find((lane) => lane.lane === "blocked")?.count ?? 0;
-    const review = snapshot.queueSnapshot.find((lane) => lane.lane === "review")?.count ?? 0;
-    const active = snapshot.queueSnapshot.filter((lane) => lane.lane === "now" || lane.lane === "next").reduce((sum, lane) => sum + lane.count, 0);
+    const blocked = tasks.filter((t) => t.lane === "blocked").length;
+    const review = tasks.filter((t) => t.lane === "review").length;
+    const active = tasks.filter((t) => t.lane === "now" || t.lane === "next").length;
 
     const summary: TasksSummaryViewModel = {
       totalTasksLabel: String(cards.length),
@@ -143,10 +63,94 @@ export function useTasksViewModel(snapshot: DashboardSnapshotDto) {
       activeLanesLabel: String(active),
     };
 
-    return {
-      lanes,
-      cards,
-      summary,
-    };
-  }, [snapshot.queueSnapshot]);
+    return { lanes, cards, summary };
+  }, [snapshot, liveTasks]);
+}
+
+function buildLanesFromTasks(tasks: Task[]): TaskQueueLaneDto[] {
+  const laneOrder = ["now", "next", "review", "blocked"] as const;
+  return laneOrder.map((lane) => ({
+    lane: lane as TaskQueueLaneDto["lane"],
+    label: laneLabels[lane],
+    stateLabel: `${tasks.filter((t) => t.lane === lane).length} tasks`,
+    count: tasks.filter((t) => t.lane === lane).length,
+    etaMinutes: null,
+  }));
+}
+
+function buildSeedTasks(): Task[] {
+  // Mirrors the original taskSeed logic — used only when no live tasks available
+  return [
+    {
+      id: "T-584",
+      title: "Promote scheduler pulse to NOW lane",
+      lane: "now" as TaskLane,
+      status: "in progress",
+      assignee: "Planner",
+      priority: "P1",
+      summary: "A fresh runtime pulse was detected and is being normalized into the active queue.",
+      detail: "Scheduler reconciles stale tasks, reorders lane depth, and emits a new runtime cursor once the queue state settles.",
+      model: "MiniMax-M2.7",
+      createdAt: new Date(Date.now() - 4 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 4 * 60000).toISOString(),
+      etaMinutes: 12,
+    },
+    {
+      id: "T-571",
+      title: "Unstick ops worker session",
+      lane: "blocked" as TaskLane,
+      status: "blocked",
+      assignee: "Ops",
+      priority: "P0",
+      summary: "A worker has missed several heartbeats and needs manual confirmation.",
+      detail: "The task is waiting on a restarted local transport session before it can be safely retried.",
+      blockingReason: "No heartbeat for 11m on ops lane.",
+      model: "gpt-5.3-codex",
+      createdAt: new Date(Date.now() - 11 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 11 * 60000).toISOString(),
+      etaMinutes: null,
+    },
+    {
+      id: "T-612",
+      title: "Review ticket 4 merge",
+      lane: "review" as TaskLane,
+      status: "awaiting review",
+      assignee: "Coder",
+      priority: "P2",
+      summary: "Merged work is queued for lint/build confirmation before it can be promoted.",
+      detail: "The review card is holding the line until the build remains green and the shell is validated on the Tasks page.",
+      model: "gpt-5.4-mini",
+      createdAt: new Date(Date.now() - 18 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 18 * 60000).toISOString(),
+      etaMinutes: 9,
+    },
+    {
+      id: "T-618",
+      title: "Refresh routing fallback policy",
+      lane: "next" as TaskLane,
+      status: "queued",
+      assignee: "Research",
+      priority: "P3",
+      summary: "Model share is being rebalanced after a fallback spike.",
+      detail: "This task watches the router and prepares a safer default when high-latency models trend upward.",
+      model: "MiniMax-M2.7",
+      createdAt: new Date(Date.now() - 27 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 27 * 60000).toISOString(),
+      etaMinutes: 31,
+    },
+    {
+      id: "T-601",
+      title: "Finalize cost watch alert",
+      lane: "done" as TaskLane,
+      status: "done",
+      assignee: "Planner",
+      priority: "P2",
+      summary: "Budget guardrails were confirmed and the alert was dismissed.",
+      detail: "Historical spend is now visible in the dashboard and the cost threshold is tracked via runtime metrics.",
+      model: "gpt-5.4",
+      createdAt: new Date(Date.now() - 42 * 60000).toISOString(),
+      updatedAt: new Date(Date.now() - 42 * 60000).toISOString(),
+      etaMinutes: null,
+    },
+  ];
 }
