@@ -1,21 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type React from "react";
 import { AlertTriangle, ArrowUpRight, Bot, Clock3, Command, Cpu, DollarSign, Layers3, ListTodo, Router } from "lucide-react";
 
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import { MetricCard, Panel, SectionHeader } from "@/src/components/primitives";
-import type {
-  AgentHealth,
-  AlertSeverity,
-  DashboardIncrementalPatchDto,
-  DashboardRuntimeStateDto,
-  DashboardSnapshotDto,
-} from "@/src/runtime/dashboard/types";
+import type { AgentHealth, AlertSeverity, DashboardRuntimeStateDto } from "@/src/runtime/dashboard/types";
+import { useDashboardRuntime } from "@/src/runtime/dashboard/useDashboardRuntime";
 
 const CURSOR_STORAGE_KEY = "mission-control.dashboard.cursor";
-const MAX_LOGS = 40;
 
 function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "warning" | "critical" }) {
   const toneClass =
@@ -56,189 +50,11 @@ function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function applyPatch(snapshot: DashboardSnapshotDto, patch: DashboardIncrementalPatchDto): DashboardSnapshotDto {
-  if (patch.type === "log.append") {
-    const incoming = patch.logs ?? [];
-    if (incoming.length === 0) {
-      return snapshot;
-    }
-
-    const merged = [...snapshot.recentLogs, ...incoming];
-    const deduped = Array.from(new Map(merged.map((log) => [log.id, log])).values());
-
-    return {
-      ...snapshot,
-      generatedAtIso: patch.emittedAtIso,
-      recentLogs: deduped.slice(-MAX_LOGS),
-    };
-  }
-
-  if (patch.type === "alert.upsert" && patch.alert) {
-    const existingIndex = snapshot.alerts.findIndex((alert) => alert.id === patch.alert?.id);
-    const alerts = [...snapshot.alerts];
-
-    if (existingIndex >= 0) {
-      alerts[existingIndex] = patch.alert;
-    } else {
-      alerts.unshift(patch.alert);
-    }
-
-    return {
-      ...snapshot,
-      generatedAtIso: patch.emittedAtIso,
-      alerts,
-    };
-  }
-
-  if (patch.type === "queue.lane" && patch.queueLane) {
-    const lanes = [...snapshot.queueSnapshot];
-    const existingIndex = lanes.findIndex((lane) => lane.lane === patch.queueLane?.lane);
-
-    if (existingIndex >= 0) {
-      lanes[existingIndex] = patch.queueLane;
-    } else {
-      lanes.push(patch.queueLane);
-    }
-
-    return {
-      ...snapshot,
-      generatedAtIso: patch.emittedAtIso,
-      queueSnapshot: lanes,
-    };
-  }
-
-  return snapshot;
-}
-
-async function fetchRuntime(cursor?: string): Promise<DashboardRuntimeStateDto> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  const response = await fetch(`/api/runtime/dashboard${query}`, {
-    method: "GET",
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`runtime-fetch-failed-${response.status}`);
-  }
-
-  return (await response.json()) as DashboardRuntimeStateDto;
-}
-
 export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardRuntimeStateDto }) {
-  const [snapshot, setSnapshot] = useState(initialRuntime.snapshot);
-  const [runtimeMeta, setRuntimeMeta] = useState({
-    source: initialRuntime.source,
-    transport: initialRuntime.transport,
-    recommendedPollMs: initialRuntime.recommendedPollMs,
-    incrementalSupported: initialRuntime.incrementalSupported,
-    ssePath: initialRuntime.ssePath,
+  const { snapshot, runtimeMeta } = useDashboardRuntime({
+    initialRuntime,
+    cursorStorageKey: CURSOR_STORAGE_KEY,
   });
-
-  const cursorRef = useRef(initialRuntime.cursor);
-
-  useEffect(() => {
-    try {
-      const persisted = window.localStorage.getItem(CURSOR_STORAGE_KEY);
-      if (persisted) {
-        cursorRef.current = persisted;
-      }
-    } catch {
-      // ignore storage failures
-    }
-  }, []);
-
-  useEffect(() => {
-    const persistCursor = (cursor: string) => {
-      cursorRef.current = cursor;
-      try {
-        window.localStorage.setItem(CURSOR_STORAGE_KEY, cursor);
-      } catch {
-        // ignore storage failures
-      }
-    };
-
-    const pollOnce = async () => {
-      const runtime = await fetchRuntime(cursorRef.current);
-      setRuntimeMeta({
-        source: runtime.source,
-        transport: runtime.transport,
-        recommendedPollMs: runtime.recommendedPollMs,
-        incrementalSupported: runtime.incrementalSupported,
-        ssePath: runtime.ssePath,
-      });
-
-      if (!runtime.incrementalSupported || runtime.updates.length === 0) {
-        setSnapshot(runtime.snapshot);
-      } else {
-        setSnapshot((prev) => runtime.updates.reduce((acc, patch) => applyPatch(acc, patch), prev));
-      }
-
-      persistCursor(runtime.cursor);
-    };
-
-    if (runtimeMeta.incrementalSupported && runtimeMeta.ssePath) {
-      const streamUrl = new URL(runtimeMeta.ssePath, window.location.origin);
-      if (cursorRef.current) {
-        streamUrl.searchParams.set("cursor", cursorRef.current);
-      }
-
-      const source = new EventSource(streamUrl.toString());
-
-      source.addEventListener("snapshot", (event) => {
-        const payload = JSON.parse((event as MessageEvent<string>).data) as {
-          cursor: string;
-          source: DashboardRuntimeStateDto["source"];
-          transport: DashboardRuntimeStateDto["transport"];
-          snapshot: DashboardSnapshotDto;
-        };
-
-        setSnapshot(payload.snapshot);
-        setRuntimeMeta((prev) => ({ ...prev, source: payload.source, transport: payload.transport }));
-        persistCursor(payload.cursor);
-      });
-
-      source.addEventListener("patch", (event) => {
-        const patch = JSON.parse((event as MessageEvent<string>).data) as DashboardIncrementalPatchDto;
-        setSnapshot((prev) => applyPatch(prev, patch));
-        persistCursor(patch.cursor);
-      });
-
-      source.addEventListener("runtime", (event) => {
-        const payload = JSON.parse((event as MessageEvent<string>).data) as {
-          cursor: string;
-          source: DashboardRuntimeStateDto["source"];
-          transport: DashboardRuntimeStateDto["transport"];
-          recommendedPollMs?: number;
-        };
-
-        setRuntimeMeta((prev) => ({
-          ...prev,
-          source: payload.source,
-          transport: payload.transport,
-          recommendedPollMs: payload.recommendedPollMs ?? prev.recommendedPollMs,
-        }));
-        persistCursor(payload.cursor);
-      });
-
-      source.addEventListener("error", () => {
-        void pollOnce();
-      });
-
-      return () => {
-        source.close();
-      };
-    }
-
-    const interval = window.setInterval(() => {
-      void pollOnce();
-    }, runtimeMeta.recommendedPollMs);
-
-    void pollOnce();
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [runtimeMeta.incrementalSupported, runtimeMeta.recommendedPollMs, runtimeMeta.ssePath]);
 
   const runningTasks = useMemo(
     () => snapshot.queueSnapshot.filter((lane) => lane.lane !== "blocked").reduce((sum, lane) => sum + lane.count, 0),
