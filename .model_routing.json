@@ -1,17 +1,46 @@
 {
-  "version": 2,
-  "description": "Automatic model routing rules for this OpenClaw workspace. The assistant will pick models based on task complexity unless you request an override.",
-  "defaults": {
-    "quick": "openai/gpt-5.4-nano",
-    "complex": "openai/gpt-5.1-codex",
-    "code": "openai/gpt-5.1-codex",
-    "research": "openai/gpt-5.1-codex",
-    "heartbeat": "openai/gpt-5.4-nano"
+  "router": {
+    "model": "gpt-5-mini",
+    "temperature": 0.2,
+    "system_prompt": "You are a routing AI. Your job is to choose the cheapest model that can successfully complete the task. Never choose expensive models unless necessary."
   },
-  "heuristics": [
-    { "match": ["debug","fix","bug","code","program","script","repo"], "route": "code" },
-    { "match": ["analyze","design","strategy","architecture","research","paper","complex"], "route": "complex" },
-    { "match": ["summarize","short","quick","note","todo","remind","status"], "route": "quick" }
+  "routes": [
+    {
+      "name": "cheap_tasks",
+      "model": "openai/gpt-5-mini",
+      "conditions": ["simple questions","summarization","formatting","basic code","chat","short responses"]
+    },
+    {
+      "name": "mid_tasks",
+      "model": "openai/gpt-5",
+      "conditions": ["multi-step reasoning","moderate coding","planning","agent coordination","longer outputs"]
+    },
+    {
+      "name": "heavy_tasks",
+      "model": "openai/gpt-5.2-codex",
+      "reasoning": "high",
+      "conditions": ["multi-file code edits","debugging complex errors","refactoring","large codebases","tool usage","agent stuck retries"]
+    }
   ],
-  "notes": "Heartbeat and quick tasks default to GPT-5.4 nano (openai/gpt-5.4-nano). If the model is unavailable the assistant will fall back to openai/gpt-5-mini unless you instruct otherwise. You can override per-task by specifying 'model: <model-name>'."
+  "fallbacks": [
+    { "from": "openai/gpt-5-mini", "to": "openai/gpt-5", "on": ["failure","low confidence","incomplete output"] },
+    { "from": "openai/gpt-5", "to": "openai/gpt-5.2-codex", "on": ["code failure","complex reasoning failure"] }
+  ],
+  "budget": {
+    "max_cost_per_task": 0.30,
+    "max_daily_cost": 5.00,
+    "codex_usage_limit_percent": 20
+  },
+  "rules": [
+    "Never use codex for simple prompts",
+    "Try gpt-5-mini at least once before escalation",
+    "Limit codex to max 2 retries per task"
+  ],
+  "intents": {
+    "chat": "gpt-5-mini",
+    "research": "gpt-5",
+    "code_simple": "gpt-5-mini",
+    "code_complex": "gpt-5.2-codex",
+    "debugging": "gpt-5.2-codex"
+  }
 }
