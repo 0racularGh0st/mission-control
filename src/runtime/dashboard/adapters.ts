@@ -1,19 +1,9 @@
-import type {
-  DashboardIncrementalPatchDto,
-  DashboardRuntimeStateDto,
-  DashboardSnapshotDto,
-  RuntimeLogEntryDto,
-  RuntimeSource,
-} from "./types";
+import { FileBackedLocalDashboardTransport, type DashboardLocalTransport } from "./localTransport";
+import type { DashboardRuntimeStateDto, DashboardSnapshotDto, RuntimeLogEntryDto, RuntimeSource } from "./types";
 
 interface DashboardRuntimeAdapter {
   getSnapshot(): Promise<DashboardSnapshotDto>;
   getRuntimeState(cursor?: string): Promise<DashboardRuntimeStateDto>;
-}
-
-interface DashboardLocalTransport {
-  readSnapshot(): Promise<DashboardSnapshotDto>;
-  readUpdates(cursor?: string): Promise<DashboardIncrementalPatchDto[]>;
 }
 
 const now = new Date();
@@ -109,33 +99,8 @@ class MockDashboardAdapter implements DashboardRuntimeAdapter {
   }
 }
 
-class LocalDashboardTransport implements DashboardLocalTransport {
-  async readSnapshot(): Promise<DashboardSnapshotDto> {
-    return attachTime(mockSnapshot, "local-api");
-  }
-
-  async readUpdates(cursor?: string): Promise<DashboardIncrementalPatchDto[]> {
-    if (!cursor) {
-      return [];
-    }
-
-    return [
-      {
-        cursor: createCursor(),
-        logs: [
-          {
-            id: "log-update-1",
-            message: "Local transport boundary is active; incremental payload shape reserved for runtime feed.",
-            createdAtIso: new Date().toISOString(),
-          },
-        ],
-      },
-    ];
-  }
-}
-
 class LocalDashboardAdapter implements DashboardRuntimeAdapter {
-  constructor(private readonly transport: DashboardLocalTransport = new LocalDashboardTransport()) {}
+  constructor(private readonly transport: DashboardLocalTransport = new FileBackedLocalDashboardTransport(mockSnapshot)) {}
 
   async getSnapshot(): Promise<DashboardSnapshotDto> {
     return this.transport.readSnapshot();
@@ -143,11 +108,12 @@ class LocalDashboardAdapter implements DashboardRuntimeAdapter {
 
   async getRuntimeState(cursor?: string): Promise<DashboardRuntimeStateDto> {
     const snapshot = await this.getSnapshot();
+    const latestCursor = await this.transport.issueCursor(snapshot);
 
     return {
       transport: "poll",
       source: "local",
-      cursor: createCursor(),
+      cursor: latestCursor,
       recommendedPollMs: 2_000,
       incrementalSupported: true,
       ssePath: "/api/runtime/dashboard/stream",
