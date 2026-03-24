@@ -3,14 +3,15 @@
 # dependencies
 /node_modules
 /.pnp
-.pnp.js
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # testing
 /coverage
-/cypress/screenshots
-/cypress/videos
-/cypress/downloads
-/cypress/results
 
 # next.js
 /.next/
@@ -27,10 +28,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# local env files
-.env*.local
-.env
+# env files (can opt-in for committing if needed)
+.env*
 
 # vercel
 .vercel
@@ -38,47 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# mock service worker
-/public/mockServiceWorker.js
-
-# IDEs
-.idea
-.vscode
-.claude
-
-# SonarQube
-.scannerwork
-*storybook.log
-storybook-static
-
-# local mdx files
-*.mdx.local
-
-# local planning files
-*.plan.local
-
-# kt doc
-PROJECT_HANDOFF.md
-
-# local folder
-/local
-
-# migration comparison reports
-/scripts/migration-compare/reports
-/scripts/migration-compare/dist
-.augment/rules/AUGMENT_RULES.md
-
-# Orval build artifacts
-/openapi/openapi-camel.yaml
-.prettierrc.json
-.github/copilot-instructions.md
-
-# Playwright
-node_modules/
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/playwright/.auth/
-couple.json
