@@ -1,35 +1,82 @@
-/* Jarvis dark-first tokens */
-:root {
-  --bg: #05060a;
-  --panel: #0b0f14;
-  --muted: #9aa4ad;
-  --text: #e6eef3;
-  --accent: #4ef08a;
-  --accent-2: #6fd3ff;
-  --border: rgba(255,255,255,0.06);
-  --glass: rgba(255,255,255,0.03);
-  --space-4: 4px;
-  --space-8: 8px;
-  --space-12: 12px;
-  --space-16: 16px;
-  --space-24: 24px;
-  --space-32: 32px;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-}
-
+:root,
 [data-theme="jarvis-dark"] {
-  --bg: #05060a;
-  --panel: rgba(11,15,20,0.95);
-  --muted: #9aa4ad;
-  --text: #e6eef3;
-  --accent: #4ef08a;
-  --accent-2: #6fd3ff;
-  --border: rgba(255,255,255,0.06);
-  --glass: rgba(255,255,255,0.03);
+  color-scheme: dark;
+
+  /* Core mission-control tokens */
+  --mc-bg: oklch(0.14 0.01 260);
+  --mc-surface: oklch(0.18 0.014 258);
+  --mc-surface-elevated: oklch(0.21 0.015 258);
+  --mc-border: oklch(0.35 0.015 260 / 0.45);
+  --mc-text: oklch(0.94 0.01 260);
+  --mc-text-muted: oklch(0.72 0.015 260);
+  --mc-accent: oklch(0.72 0.16 158);
+  --mc-accent-cyan: oklch(0.76 0.11 220);
+
+  --mc-space-4: 4px;
+  --mc-space-8: 8px;
+  --mc-space-12: 12px;
+  --mc-space-16: 16px;
+  --mc-space-24: 24px;
+  --mc-space-32: 32px;
+
+  --mc-radius-sm: 0.5rem;
+  --mc-radius-md: 0.75rem;
+  --mc-radius-lg: 1rem;
+  --mc-shadow-1: 0 1px 0 0 oklch(1 0 0 / 0.06), 0 8px 32px -16px oklch(0 0 0 / 0.6);
+
+  /* shadcn-compatible semantic tokens */
+  --background: var(--mc-bg);
+  --foreground: var(--mc-text);
+  --card: var(--mc-surface);
+  --card-foreground: var(--mc-text);
+  --popover: var(--mc-surface-elevated);
+  --popover-foreground: var(--mc-text);
+  --primary: var(--mc-accent);
+  --primary-foreground: oklch(0.14 0.01 260);
+  --secondary: oklch(0.25 0.015 258);
+  --secondary-foreground: var(--mc-text);
+  --muted: oklch(0.25 0.01 258);
+  --muted-foreground: var(--mc-text-muted);
+  --accent: oklch(0.26 0.03 165);
+  --accent-foreground: var(--mc-text);
+  --destructive: oklch(0.62 0.19 24);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: var(--mc-border);
+  --input: oklch(0.29 0.01 258);
+  --ring: oklch(0.66 0.12 162 / 0.8);
+  --radius: var(--mc-radius-md);
 }
 
-/* Helpers */
-.bg-jarvis { background-color: var(--bg); color: var(--text); }
-.panel { background-color: var(--panel); color: var(--text); border: 1px solid var(--border); }
-.text-muted { color: var(--muted); }
-.btn-jarvis { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); color: var(--text); border-radius: 12px; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.04); }
+.dark {
+  color-scheme: dark;
+}
+
+.bg-jarvis {
+  background-color: var(--mc-bg);
+  color: var(--mc-text);
+}
+
+.panel {
+  background-color: var(--mc-surface);
+  border: 1px solid var(--mc-border);
+  box-shadow: var(--mc-shadow-1);
+}
+
+.glass-panel {
+  background: color-mix(in oklch, var(--mc-surface-elevated) 75%, transparent);
+  border: 1px solid color-mix(in oklch, var(--mc-border) 85%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.text-muted {
+  color: var(--mc-text-muted);
+}
+
+.accent-glow {
+  box-shadow: 0 0 0 1px oklch(from var(--mc-accent) l c h / 0.2),
+    0 0 28px -8px oklch(from var(--mc-accent) l c h / 0.45);
+}
+
+.dashboard-shell {
+  @apply mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8;
+}

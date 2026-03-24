@@ -1,26 +1,51 @@
 "use client";
-import React, { useEffect, useState } from 'react';
 
-export default function ModelsPage(){
-  const [models, setModels] = useState<any[]>([]);
+import { useEffect, useState } from "react";
+
+type Model = {
+  id: string;
+  tier: string;
+  example_cost_per_1k: number;
+};
+
+type ModelsApiResponse = {
+  models?: Model[];
+  error?: string;
+};
+
+export default function ModelsPage() {
+  const [models, setModels] = useState<Model[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(()=>{
-    fetch('/api/models').then(r=>r.json()).then(j=>{
-      if(j.error) setErr(j.error);
-      else setModels(j.models || []);
-    }).catch(e=>setErr(String(e)));
-  },[]);
+  useEffect(() => {
+    fetch("/api/models")
+      .then((response) => response.json() as Promise<ModelsApiResponse>)
+      .then((payload) => {
+        if (payload.error) {
+          setErr(payload.error);
+          return;
+        }
+        setModels(payload.models ?? []);
+      })
+      .catch((error: unknown) => {
+        setErr(error instanceof Error ? error.message : String(error));
+      });
+  }, []);
 
-  if(err) return <div className="p-6 text-red-400">Error: {err}</div>;
+  if (err) {
+    return <div className="p-6 text-red-400">Error: {err}</div>;
+  }
+
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 p-6">
       <h2 className="text-lg font-semibold">Available models (workspace)</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {models.map((m:any)=> (
-          <div key={m.id} className="panel p-3 rounded-2xl">
-            <div className="font-medium">{m.id}</div>
-            <div className="text-sm text-slate-400">Tier: {m.tier} • cost: ${m.example_cost_per_1k}/1k</div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {models.map((model) => (
+          <div key={model.id} className="panel rounded-2xl p-3">
+            <div className="font-medium">{model.id}</div>
+            <div className="text-muted text-sm">
+              Tier: {model.tier} • cost: ${model.example_cost_per_1k}/1k
+            </div>
           </div>
         ))}
       </div>

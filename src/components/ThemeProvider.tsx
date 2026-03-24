@@ -1,36 +1,54 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import '../../app/styles/tokens.css';
 
-type Theme = 'jarvis-dark' | string;
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-const ThemeContext = createContext({ theme: 'jarvis-dark' as Theme, setTheme: (t: Theme) => {}, toggleTheme: () => {} });
+type Theme = "jarvis-dark";
 
-export function ThemeProvider({ children }: { children: React.ReactNode }){
-  const STORAGE_KEY = 'theme';
-  const defaultTheme: Theme = 'jarvis-dark';
-  const [theme, setThemeState] = useState<Theme>(defaultTheme);
+type ThemeContextValue = {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+};
 
-  useEffect(() => {
-    try{
-      const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if(saved) setThemeState(saved);
-    }catch{}
-  }, []);
+const STORAGE_KEY = "theme";
+const DEFAULT_THEME: Theme = "jarvis-dark";
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    try{ localStorage.setItem(STORAGE_KEY, theme); }catch{}
-  }, [theme]);
+const ThemeContext = createContext<ThemeContextValue>({
+  theme: DEFAULT_THEME,
+  setTheme: () => undefined,
+  toggleTheme: () => undefined,
+});
 
-  function setTheme(t: Theme){ setThemeState(t); }
-  function toggleTheme(){ setThemeState((cur) => (cur === 'jarvis-dark' ? 'jarvis-dark' : 'jarvis-dark')); }
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") {
+    return DEFAULT_THEME;
+  }
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+  return savedTheme === "jarvis-dark" ? savedTheme : DEFAULT_THEME;
 }
 
-export function useTheme(){ return useContext(ThemeContext); }
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+    document.documentElement.setAttribute("data-theme", theme);
+    window.localStorage.setItem(STORAGE_KEY, theme);
+  }, [theme]);
+
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      theme,
+      setTheme,
+      toggleTheme: () => setTheme("jarvis-dark"),
+    }),
+    [theme]
+  );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+export function useTheme() {
+  return useContext(ThemeContext);
+}
