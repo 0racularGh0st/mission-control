@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
 import type React from "react";
 import { AlertTriangle, ArrowUpRight, Bot, Clock3, Command, Cpu, DollarSign, Layers3, ListTodo, Router } from "lucide-react";
 
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import { MetricCard, Panel, SectionHeader } from "@/src/components/primitives";
-import type { AgentHealth, AlertSeverity, DashboardRuntimeStateDto } from "@/src/runtime/dashboard/types";
+import type { DashboardRuntimeStateDto } from "@/src/runtime/dashboard/types";
 import { useDashboardRuntime } from "@/src/runtime/dashboard/useDashboardRuntime";
+import { type BadgeTone, useDashboardViewModel } from "@/src/viewmodels/useDashboardViewModel";
 
 const CURSOR_STORAGE_KEY = "mission-control.dashboard.cursor";
 
-function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "warning" | "critical" }) {
+function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: BadgeTone }) {
   const toneClass =
     tone === "critical"
       ? "bg-destructive/15 text-destructive border-destructive/35"
@@ -22,62 +22,13 @@ function Badge({ children, tone = "default" }: { children: React.ReactNode; tone
   return <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${toneClass}`}>{children}</span>;
 }
 
-function healthToTone(health: AgentHealth): "default" | "warning" {
-  return health === "degraded" ? "warning" : "default";
-}
-
-function severityToTone(severity: AlertSeverity): "warning" | "critical" {
-  return severity;
-}
-
-function formatTokens(value: number) {
-  return `${Math.round(value / 1000)}k`;
-}
-
-function formatUsd(value: number) {
-  return `$${value.toFixed(2)}`;
-}
-
-function formatLatency(ms: number) {
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatEta(minutes: number | null) {
-  return minutes == null ? "unknown" : `~${minutes}m`;
-}
-
-function titleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardRuntimeStateDto }) {
   const { snapshot, runtimeMeta } = useDashboardRuntime({
     initialRuntime,
     cursorStorageKey: CURSOR_STORAGE_KEY,
   });
 
-  const runningTasks = useMemo(
-    () => snapshot.queueSnapshot.filter((lane) => lane.lane !== "blocked").reduce((sum, lane) => sum + lane.count, 0),
-    [snapshot.queueSnapshot],
-  );
-  const waitingReview = useMemo(() => snapshot.queueSnapshot.find((lane) => lane.lane === "review")?.count ?? 0, [snapshot.queueSnapshot]);
-  const criticalAlerts = useMemo(() => snapshot.alerts.filter((alert) => alert.severity === "critical").length, [snapshot.alerts]);
-  const warningAlerts = useMemo(() => snapshot.alerts.filter((alert) => alert.severity === "warning").length, [snapshot.alerts]);
-
-  const metrics = [
-    {
-      label: "Active agents",
-      value: String(snapshot.activeAgents.length).padStart(2, "0"),
-      delta: `${snapshot.activeAgents.filter((agent) => agent.health === "busy").length} busy now`,
-    },
-    { label: "Running tasks", value: String(runningTasks), delta: `${waitingReview} waiting review` },
-    {
-      label: "Token burn",
-      value: formatTokens(snapshot.tokenCostSummary.inputTokens + snapshot.tokenCostSummary.outputTokens),
-      delta: `${formatUsd(snapshot.tokenCostSummary.totalCostUsd)} today`,
-    },
-    { label: "Alerts", value: String(snapshot.alerts.length).padStart(2, "0"), delta: `${criticalAlerts} critical, ${warningAlerts} warning` },
-  ];
+  const { metrics, agents, queueLanes, tokenRows, routes, alerts, recentLogs, hasLogs } = useDashboardViewModel(snapshot);
 
   return (
     <main className="dashboard-shell space-y-6">
@@ -87,7 +38,7 @@ export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardR
         action={
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Command className="h-3.5 w-3.5" />
-            <span>Jump: ⌘K</span>
+            <span>Jump: ⌘K · Actions: ?</span>
           </div>
         }
       />
@@ -101,16 +52,16 @@ export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardR
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr]">
         <Panel title="Active agents" description="Live worker status, queue load, and median latency by role.">
           <div className="space-y-2">
-            {snapshot.activeAgents.map((agent) => (
+            {agents.map((agent) => (
               <div key={agent.id} className="grid grid-cols-[minmax(0,1.2fr)_auto_auto_auto_auto] items-center gap-2 rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
                 <div className="min-w-0">
                   <div className="truncate font-medium text-foreground">{agent.name}</div>
                   <div className="truncate text-muted-foreground">{agent.role}</div>
                 </div>
-                <Badge tone={healthToTone(agent.health)}>{titleCase(agent.health)}</Badge>
+                <Badge tone={agent.healthTone}>{agent.healthLabel}</Badge>
                 <div className="text-muted-foreground">{agent.model}</div>
-                <div className="text-muted-foreground">Q {agent.queueDepth}</div>
-                <div className="text-right text-muted-foreground">{formatLatency(agent.medianLatencyMs)}</div>
+                <div className="text-muted-foreground">{agent.queueDepthLabel}</div>
+                <div className="text-right text-muted-foreground">{agent.latencyLabel}</div>
               </div>
             ))}
           </div>
@@ -118,14 +69,12 @@ export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardR
 
         <Panel title="Task queue snapshot" description="Current lane pressure and expected completion windows.">
           <div className="space-y-2">
-            {snapshot.queueSnapshot.map((lane) => (
+            {queueLanes.map((lane) => (
               <div key={lane.lane} className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2 rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
                 <Layers3 className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="font-medium">{lane.label}</span>
                 <span className="text-muted-foreground">{lane.stateLabel}</span>
-                <span className="text-muted-foreground">
-                  {lane.count} · {formatEta(lane.etaMinutes)}
-                </span>
+                <span className="text-muted-foreground">{lane.summaryLabel}</span>
               </div>
             ))}
           </div>
@@ -135,47 +84,28 @@ export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardR
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr_1.05fr]">
         <Panel title="Token & cost summary" description="Usage and spend trend for this session window.">
           <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">Input tokens</span>
-              <div className="text-right">
-                <div className="font-medium text-foreground">{formatTokens(snapshot.tokenCostSummary.inputTokens)}</div>
-                <div className="text-muted-foreground">+{snapshot.tokenCostSummary.inputDeltaPct.toFixed(1)}%</div>
+            {tokenRows.map((row) => (
+              <div key={row.label} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
+                <span className="text-muted-foreground">{row.label}</span>
+                <div className="text-right">
+                  <div className="font-medium text-foreground">{row.valueLabel}</div>
+                  <div className="text-muted-foreground">{row.deltaLabel}</div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">Output tokens</span>
-              <div className="text-right">
-                <div className="font-medium text-foreground">{formatTokens(snapshot.tokenCostSummary.outputTokens)}</div>
-                <div className="text-muted-foreground">+{snapshot.tokenCostSummary.outputDeltaPct.toFixed(1)}%</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">Total cost</span>
-              <div className="text-right">
-                <div className="font-medium text-foreground">{formatUsd(snapshot.tokenCostSummary.totalCostUsd)}</div>
-                <div className="text-muted-foreground">+{formatUsd(snapshot.tokenCostSummary.costDeltaUsd)}</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">Projected day-end</span>
-              <div className="text-right">
-                <div className="font-medium text-foreground">{formatUsd(snapshot.tokenCostSummary.projectedDayEndUsd)}</div>
-                <div className="text-muted-foreground">{snapshot.tokenCostSummary.withinBudget ? "within budget" : "over budget"}</div>
-              </div>
-            </div>
+            ))}
           </div>
         </Panel>
 
         <Panel title="Model routing summary" description="Live traffic split across active model providers.">
           <div className="space-y-2">
-            {snapshot.modelRouting.map((route) => (
+            {routes.map((route) => (
               <div key={route.model} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-xs">
                 <Router className="h-3.5 w-3.5 text-muted-foreground" />
                 <div>
                   <div className="font-medium">{route.model}</div>
                   <div className="text-muted-foreground">{route.role}</div>
                 </div>
-                <span className="text-muted-foreground">{route.sharePct}%</span>
+                <span className="text-muted-foreground">{route.shareLabel}</span>
               </div>
             ))}
           </div>
@@ -183,14 +113,14 @@ export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardR
 
         <Panel title="Alerts / stuck tasks" description="Priority issues requiring operator action.">
           <div className="space-y-2">
-            {snapshot.alerts.map((alert) => (
+            {alerts.map((alert) => (
               <div key={alert.id} className="rounded-lg border border-border/60 bg-background/35 px-3 py-2">
                 <div className="mb-1 flex items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-1.5 font-medium">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-200" />
                     {alert.title}
                   </div>
-                  <Badge tone={severityToTone(alert.severity)}>{alert.severity}</Badge>
+                  <Badge tone={alert.severityTone}>{alert.severityLabel}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">{alert.detail}</p>
               </div>
@@ -201,13 +131,19 @@ export function DashboardClient({ initialRuntime }: { initialRuntime: DashboardR
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.7fr_1fr]">
         <Panel title="Recent logs" description="Latest execution and orchestration events from runtime.">
-          <div className="space-y-2 font-mono text-xs">
-            {snapshot.recentLogs.map((entry) => (
-              <div key={entry.id} className="rounded-md border border-border/60 bg-background/35 px-3 py-2 text-muted-foreground">
-                {entry.message}
-              </div>
-            ))}
-          </div>
+          {hasLogs ? (
+            <div className="space-y-2 font-mono text-xs">
+              {recentLogs.map((entry) => (
+                <div key={entry.id} className="rounded-md border border-border/60 bg-background/35 px-3 py-2 text-muted-foreground">
+                  {entry.message}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border/60 bg-background/20 px-3 py-4 text-xs text-muted-foreground">
+              No runtime logs yet. Execution events will stream here once tasks begin.
+            </div>
+          )}
         </Panel>
 
         <Panel>
