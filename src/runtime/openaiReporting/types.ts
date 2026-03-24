@@ -8,6 +8,16 @@ export type OpenAIAdminReportingDto = {
     outputTokens: number;
     requests: number;
   };
+  budget: {
+    configured: boolean;
+    budgetUsd: number;
+    spendUsd: number;
+    remainingUsd: number;
+    progressRatio: number;
+    resetAt: string;
+    resetInDays: number;
+    editHint: string;
+  };
   endpoints: {
     costs: {
       ok: boolean;

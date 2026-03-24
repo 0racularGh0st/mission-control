@@ -8,8 +8,15 @@ type AdminFetchResult = {
   error?: string;
 };
 
+type UsageSummary = {
+  inputTokens: number;
+  outputTokens: number;
+  requests: number;
+};
+
 const OPENAI_ADMIN_BASE_URL = "https://api.openai.com/v1/organization";
 const DEFAULT_LOOKBACK_DAYS = 30;
+const DEFAULT_BUDGET_PLACEHOLDER = "Set OPENAI_MONTHLY_BUDGET_USD in server env to enable editing.";
 
 function getStartUnixTime(days: number) {
   return Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
@@ -28,64 +35,91 @@ function toNumber(value: unknown): number {
   return 0;
 }
 
-function summarizeCosts(payload: unknown): number {
-  if (!payload || typeof payload !== "object") {
-    return 0;
-  }
+function collectObjects(payload: unknown): Record<string, unknown>[] {
+  const collected: Record<string, unknown>[] = [];
 
-  const data = (payload as { data?: unknown }).data;
-  if (!Array.isArray(data)) {
-    return 0;
-  }
-
-  return data.reduce((sum, row) => {
-    if (!row || typeof row !== "object") {
-      return sum;
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== "object") {
+      return;
     }
 
-    const entry = row as {
-      amount?: { value?: unknown };
-      cost_usd?: unknown;
-      total_cost_usd?: unknown;
-      value?: unknown;
-    };
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
 
-    return sum + toNumber(entry.amount?.value ?? entry.cost_usd ?? entry.total_cost_usd ?? entry.value);
-  }, 0);
+    const objectNode = node as Record<string, unknown>;
+    collected.push(objectNode);
+
+    Object.values(objectNode).forEach(visit);
+  };
+
+  visit(payload);
+  return collected;
+}
+
+function summarizeCosts(payload: unknown) {
+  let sum = 0;
+  let matchedRows = 0;
+
+  for (const entry of collectObjects(payload)) {
+    const amount = entry.amount;
+    const amountValue = amount && typeof amount === "object" ? (amount as { value?: unknown }).value : undefined;
+    const value = amountValue ?? entry.cost_usd ?? entry.total_cost_usd ?? entry.value;
+    const parsed = toNumber(value);
+
+    if (parsed > 0) {
+      sum += parsed;
+      matchedRows += 1;
+    }
+  }
+
+  return { total: sum, matchedRows };
 }
 
 function summarizeUsage(payload: unknown) {
-  const zero = { inputTokens: 0, outputTokens: 0, requests: 0 };
+  const summary: UsageSummary = { inputTokens: 0, outputTokens: 0, requests: 0 };
+  let matchedRows = 0;
 
-  if (!payload || typeof payload !== "object") {
-    return zero;
+  for (const entry of collectObjects(payload)) {
+    const inputTokens = toNumber(entry.input_tokens);
+    const outputTokens = toNumber(entry.output_tokens);
+    const requests = toNumber(entry.num_model_requests ?? entry.requests);
+
+    if (inputTokens > 0 || outputTokens > 0 || requests > 0) {
+      summary.inputTokens += inputTokens;
+      summary.outputTokens += outputTokens;
+      summary.requests += requests;
+      matchedRows += 1;
+    }
   }
 
-  const data = (payload as { data?: unknown }).data;
-  if (!Array.isArray(data)) {
-    return zero;
-  }
+  return { ...summary, matchedRows };
+}
 
-  return data.reduce(
-    (acc, row) => {
-      if (!row || typeof row !== "object") {
-        return acc;
-      }
+function buildBudgetSummary(spendUsd: number) {
+  const rawBudget = process.env.OPENAI_MONTHLY_BUDGET_USD;
+  const budgetUsd = toNumber(rawBudget);
+  const configured = budgetUsd > 0;
 
-      const entry = row as {
-        input_tokens?: unknown;
-        output_tokens?: unknown;
-        num_model_requests?: unknown;
-        requests?: unknown;
-      };
+  const now = new Date();
+  const resetAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0));
+  const msRemaining = Math.max(resetAt.getTime() - Date.now(), 0);
+  const resetInDays = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
 
-      acc.inputTokens += toNumber(entry.input_tokens);
-      acc.outputTokens += toNumber(entry.output_tokens);
-      acc.requests += toNumber(entry.num_model_requests ?? entry.requests);
-      return acc;
-    },
-    { ...zero },
-  );
+  const progressRatio = configured ? Math.min(spendUsd / budgetUsd, 1) : 0;
+  const remainingUsd = configured ? budgetUsd - spendUsd : 0;
+
+  return {
+    configured,
+    budgetUsd,
+    spendUsd,
+    remainingUsd,
+    progressRatio,
+    resetAt: resetAt.toISOString(),
+    resetInDays,
+    editHint: DEFAULT_BUDGET_PLACEHOLDER,
+  };
 }
 
 async function fetchAdminPath(apiKey: string, pathWithQuery: string): Promise<AdminFetchResult> {
@@ -159,6 +193,7 @@ export async function getOpenAIAdminReporting(): Promise<OpenAIAdminReportingDto
         outputTokens: 0,
         requests: 0,
       },
+      budget: buildBudgetSummary(0),
       endpoints: {
         costs: {
           ok: false,
@@ -173,7 +208,10 @@ export async function getOpenAIAdminReporting(): Promise<OpenAIAdminReportingDto
           error: "OPENAI_ADMIN_API_KEY missing",
         },
       },
-      notes: ["Configured fallback response because OPENAI_ADMIN_API_KEY is not set."],
+      notes: [
+        "Configured fallback response because OPENAI_ADMIN_API_KEY is not set.",
+        "No live OpenAI payload could be parsed.",
+      ],
     };
   }
 
@@ -185,27 +223,40 @@ export async function getOpenAIAdminReporting(): Promise<OpenAIAdminReportingDto
     fetchAdminPath(apiKey, `/usage/completions${query}`),
   ]);
 
-  const spendUsd = costsResult.ok ? summarizeCosts(costsResult.body) : 0;
-  const usageSummary = usageResult.ok ? summarizeUsage(usageResult.body) : summarizeUsage(null);
+  const costSummary = costsResult.ok ? summarizeCosts(costsResult.body) : { total: 0, matchedRows: 0 };
+  const usageSummary = usageResult.ok
+    ? summarizeUsage(usageResult.body)
+    : { inputTokens: 0, outputTokens: 0, requests: 0, matchedRows: 0 };
 
   const notes: string[] = [];
+
   if (!costsResult.ok) {
     notes.push("Costs endpoint unavailable (permission or API variance). Returning zero spend fallback.");
+  } else if (costSummary.matchedRows === 0) {
+    notes.push("Costs endpoint returned no parseable amount fields. Check response shape/permissions.");
   }
+
   if (!usageResult.ok) {
     notes.push("Usage endpoint unavailable (permission or API variance). Returning zero token/request fallback.");
+  } else if (usageSummary.matchedRows === 0) {
+    notes.push("Usage endpoint returned no parseable token/request fields. Check response shape/permissions.");
   }
+
+  notes.push(
+    `Diagnostics: parsed cost rows=${costSummary.matchedRows}, usage rows=${usageSummary.matchedRows}, lookback=${DEFAULT_LOOKBACK_DAYS}d.`,
+  );
 
   return {
     source: costsResult.ok || usageResult.ok ? "live" : "mock",
     generatedAt,
     lookbackDays: DEFAULT_LOOKBACK_DAYS,
     totals: {
-      spendUsd,
+      spendUsd: costSummary.total,
       inputTokens: usageSummary.inputTokens,
       outputTokens: usageSummary.outputTokens,
       requests: usageSummary.requests,
     },
+    budget: buildBudgetSummary(costSummary.total),
     endpoints: {
       costs: {
         ok: costsResult.ok,

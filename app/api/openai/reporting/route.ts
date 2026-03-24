@@ -18,6 +18,16 @@ export async function GET() {
           outputTokens: 0,
           requests: 0,
         },
+        budget: {
+          configured: false,
+          budgetUsd: 0,
+          spendUsd: 0,
+          remainingUsd: 0,
+          progressRatio: 0,
+          resetAt: new Date().toISOString(),
+          resetInDays: 0,
+          editHint: "Set OPENAI_MONTHLY_BUDGET_USD in server env to enable editing.",
+        },
         endpoints: {
           costs: {
             ok: false,
