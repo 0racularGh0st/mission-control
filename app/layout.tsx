@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 import { ThemeProvider } from "@/src/components/ThemeProvider";
+import { AppShell } from "@/src/components/primitives";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +33,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full font-sans text-foreground">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );
