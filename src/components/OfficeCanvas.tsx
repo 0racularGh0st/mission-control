@@ -398,7 +398,7 @@ export function OfficeCanvas({ jarvis, cody }: OfficeCanvasProps) {
       const cx = lerp(cody.x, cody.targetX, t);
       const cy = lerp(cody.y, cody.targetY, t);
       drawCharacter(c, cx, cy, COLORS.cody, COLORS.codyDark, COLORS.codyLight, cody.state, cody.animFrame);
-      drawAgentLabel(c, cx, cy, "CODY", cody.state);
+      drawAgentLabel(c, cx, cy, "Cody", cody.state);
 
       // Draw timestamp
       c.fillStyle = "#475569";
