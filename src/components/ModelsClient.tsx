@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowRight, CheckCircle2, Cpu, GitBranch, Network, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, CheckCircle2, Network, Sparkles } from "lucide-react";
 
 import { Panel, SectionHeader } from "@/src/components/primitives";
 
