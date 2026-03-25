@@ -31,7 +31,7 @@ export function OfficeClient() {
           </span>
         </div>
         <span className="ml-auto text-muted-foreground">
-          Last updated: {new Date(state.lastUpdated).toLocaleTimeString()}
+          Last updated: <span suppressHydrationWarning>{new Date(state.lastUpdated).toLocaleTimeString("en-US", { hour12: false })}</span>
         </span>
       </div>
 
