@@ -270,7 +270,7 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
         <div className="text-muted-foreground text-sm">Loading tasks...</div>
       ) : (
         <section className="overflow-x-auto -mx-4 px-4">
-          <div className="grid gap-4 xl:grid-cols-5" style={{ minWidth: "900px" }}>
+          <div className="grid gap-4 xl:grid-cols-5" style={{ minWidth: "1200px" }}>
           {groupedCards.map(({ lane, cards: laneCards }) => {
             const laneMeta = lanes.find((item) => item.lane === lane);
             return (
@@ -278,7 +278,7 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
                 key={lane}
                 title={laneMeta?.label ?? lane.toUpperCase()}
                 description={`${laneCards.length} card${laneCards.length !== 1 ? "s" : ""}`}
-                className="h-full"
+                className="h-full min-w-[240px]"
               >
                 <div className="space-y-3">
                   {laneCards.map((card) => (
