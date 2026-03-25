@@ -96,7 +96,6 @@ function parseOpenclawSessions(stdout: string): ParsedSession[] {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 4) continue;
 
-    const kind = parts[0];
     const key = parts[1] ?? "";
     const age = parts[2] ?? "";
     const model = parts[3] ?? "";
