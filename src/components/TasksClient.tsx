@@ -258,17 +258,19 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
         }
       />
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Panel title="Total tasks"><div className="text-2xl font-semibold">{summary.totalTasksLabel}</div></Panel>
         <Panel title="Active lanes"><div className="text-2xl font-semibold">{summary.activeLanesLabel}</div></Panel>
         <Panel title="Blocked"><div className="text-2xl font-semibold">{summary.blockedTasksLabel}</div></Panel>
         <Panel title="Review"><div className="text-2xl font-semibold">{summary.reviewTasksLabel}</div></Panel>
+        <Panel title="Done"><div className="text-2xl font-semibold">{String(displayTasks.filter(t => t.lane === "done").length)}</div></Panel>
       </section>
 
       {loading ? (
         <div className="text-muted-foreground text-sm">Loading tasks...</div>
       ) : (
-        <section className="grid gap-4 xl:grid-cols-5">
+        <section className="overflow-x-auto -mx-4 px-4">
+          <div className="grid gap-4 xl:grid-cols-5" style={{ minWidth: "900px" }}>
           {groupedCards.map(({ lane, cards: laneCards }) => {
             const laneMeta = lanes.find((item) => item.lane === lane);
             return (
@@ -306,6 +308,7 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
               </Panel>
             );
           })}
+          </div>
         </section>
       )}
 
