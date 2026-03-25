@@ -11,4 +11,5 @@ export interface AgentActivityEntry {
   taskDescription: string;
   status: "running" | "completed" | "failed";
   resultSummary: string;
+  estimatedCostUsd: number; // estimated USD cost of the task
 }

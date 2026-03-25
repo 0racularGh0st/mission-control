@@ -99,6 +99,7 @@ export function AgentActivityClient() {
                   <th className="pb-2 pr-4 font-medium">Duration</th>
                   <th className="pb-2 pr-4 font-medium">In</th>
                   <th className="pb-2 pr-4 font-medium">Out</th>
+                  <th className="pb-2 pr-4 font-medium">Est. Cost</th>
                   <th className="pb-2 pr-4 font-medium">Status</th>
                   <th className="pb-2 font-medium">Task</th>
                 </tr>
@@ -126,6 +127,9 @@ export function AgentActivityClient() {
                     </td>
                     <td className="py-2 pr-4 font-mono text-xs text-right whitespace-nowrap">
                       {formatTokens(entry.tokensOut)}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-xs text-right whitespace-nowrap">
+                      {entry.estimatedCostUsd > 0 ? `$${entry.estimatedCostUsd.toFixed(4)}` : "—"}
                     </td>
                     <td className="py-2 pr-4">
                       <span
