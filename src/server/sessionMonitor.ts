@@ -1,67 +1,57 @@
 /**
- * Background session monitor — polls OpenClaw for active sessions and logs
- * agent activity automatically.
- *
- * Runs on the server side, called from the activity API route on GET.
+ * Background session monitor — parses `openclaw sessions` text output
+ * and logs active agents to the activity log.
  */
 
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { logActivity, updateActivityStatus, readActivitiesFromFile } from "@/src/server/agentActivityLog";
 
-const POLL_INTERVAL_MS = 30_000; // 30 seconds
+const execFileAsync = promisify(execFile);
+
+const POLL_INTERVAL_MS = 30_000;
 let monitorInterval: ReturnType<typeof setInterval> | null = null;
 let lastPollTime = 0;
 
-interface ActiveSession {
+interface ParsedSession {
   sessionKey: string;
+  sessionId: string; // the id: field from flags
   agentType: "jarvis" | "cody" | "sandra" | "subagent";
   model: string;
-  startedAt: string;
+  age: string;
+  tokens: string;
 }
 
-/**
- * Returns the list of sessions known to OpenClaw that are currently active.
- * Returns empty array if unavailable — always fails silently.
- */
-async function getOpenClawSessions(): Promise<ActiveSession[]> {
-  try {
-    // Dynamic import to avoid top-level import issues
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
+function parseOpenclawSessions(stdout: string): ParsedSession[] {
+  const lines = stdout.split("\n").filter((l) => l.trim() && !l.startsWith("Session store") && !l.startsWith("Sessions listed") && !l.startsWith("Kind"));
+  const sessions: ParsedSession[] = [];
 
-    // Run: openclaw sessions list --json
-    const { stdout } = await execFileAsync("openclaw", ["sessions", "list", "--json"], {
-      timeout: 5000,
-    });
+  for (const line of lines) {
+    // Text format: direct agent:main:teleg...751104  2m ago    MiniMax-M2.7   118k/205k (58%)      system id:0ee27d5f-c192-43ba-92e8-5b7340f5a621
+    const idMatch = line.match(/id:(\S+)/);
+    const id = idMatch ? idMatch[1] : "";
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 4) continue;
 
-    const output = stdout.toString().trim();
-    if (!output) return [];
+    const kind = parts[0];
+    const key = parts[1] ?? "";
+    const age = parts[2] ?? "";
+    const model = parts[3] ?? "";
 
-    const sessions = JSON.parse(output) as Array<{
-      sessionKey: string;
-      agentId?: string;
-      model?: string;
-      startedAt?: string;
-    }>;
+    // Determine agent type from session key
+    let agentType: ParsedSession["agentType"] = "subagent";
+    if (key.includes("cody")) agentType = "cody";
+    else if (key.includes("sandra")) agentType = "sandra";
+    else if (key.includes("jarvis") || key.includes("teleg")) agentType = "jarvis";
 
-    return sessions.map((s) => ({
-      sessionKey: s.sessionKey,
-      agentType: s.agentId?.includes("cody")
-        ? "cody"
-        : s.agentId?.includes("sandra")
-          ? "sandra"
-          : s.agentId?.includes("jarvis") || !s.agentId
-            ? "jarvis"
-            : "subagent",
-      model: s.model ?? "unknown",
-      startedAt: s.startedAt ?? new Date().toISOString(),
-    }));
-  } catch {
-    return [];
+    if (id) {
+      sessions.push({ sessionKey: id, sessionId: id, agentType, model, age, tokens: "" });
+    }
   }
+
+  return sessions;
 }
 
-/** Check if we already logged a "running" entry for this sessionKey recently */
 function hasRecentRunningEntry(sessionKey: string, sinceMs: number): boolean {
   const activities = readActivitiesFromFile(200);
   return activities.some(
@@ -72,10 +62,10 @@ function hasRecentRunningEntry(sessionKey: string, sinceMs: number): boolean {
   );
 }
 
-/** Log a Jarvis session start if not already logged */
 export async function ensureJarvisLogged(): Promise<void> {
   try {
-    const sessions = await getOpenClawSessions();
+    const { stdout } = await execFileAsync("openclaw", ["sessions"], { timeout: 5000 });
+    const sessions = parseOpenclawSessions(stdout);
     const jarvisSession = sessions.find((s) => s.agentType === "jarvis");
 
     if (jarvisSession && !hasRecentRunningEntry(jarvisSession.sessionKey, 60 * 60 * 1000)) {
@@ -83,8 +73,8 @@ export async function ensureJarvisLogged(): Promise<void> {
         id: `jarvis-${Date.now()}`,
         sessionKey: jarvisSession.sessionKey,
         agentType: "jarvis",
-        model: jarvisSession.model,
-        startedAt: jarvisSession.startedAt,
+        model: jarvisSession.model || "MiniMax-M2.7",
+        startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         durationMs: 0,
         tokensIn: 0,
@@ -96,33 +86,30 @@ export async function ensureJarvisLogged(): Promise<void> {
       });
     }
   } catch {
-    // silent — never fail
+    // silent
   }
 }
 
-// Track sessions seen in last poll — used to detect completions
-let previousSessionKeys = new Set<string>();
-
-/** Poll for active sessions and log any that aren't logged yet */
 export async function pollAndLogActiveSessions(): Promise<void> {
   if (Date.now() - lastPollTime < POLL_INTERVAL_MS) return;
   lastPollTime = Date.now();
 
   try {
-    const sessions = await getOpenClawSessions();
+    const { stdout } = await execFileAsync("openclaw", ["sessions"], { timeout: 5000 });
+    const sessions = parseOpenclawSessions(stdout);
+    const currentKeys = new Set(sessions.map((s) => s.sessionKey));
 
+    // Log new sessions that aren't tracked yet
     for (const session of sessions) {
-      // Skip Jarvis (handled separately by ensureJarvisLogged)
       if (session.agentType === "jarvis") continue;
 
-      // Log new subagent/cody sessions that aren't tracked yet
       if (!hasRecentRunningEntry(session.sessionKey, POLL_INTERVAL_MS * 2)) {
         logActivity({
           id: `${session.agentType}-${Date.now()}`,
           sessionKey: session.sessionKey,
           agentType: session.agentType,
-          model: session.model,
-          startedAt: session.startedAt,
+          model: session.model || "MiniMax-M2.7",
+          startedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
           durationMs: 0,
           tokensIn: 0,
@@ -135,46 +122,33 @@ export async function pollAndLogActiveSessions(): Promise<void> {
       }
     }
 
-    // Detect completions: sessions that were running but are no longer active
-    const currentKeys = new Set(sessions.map((s) => s.sessionKey));
-    for (const prevKey of previousSessionKeys) {
-      if (!currentKeys.has(prevKey)) {
-        // Session disappeared — mark as completed
-        const activities = readActivitiesFromFile(200);
-        const running = activities.find(
-          (a) => a.sessionKey === prevKey && a.status === "running",
-        );
-        if (running) {
-          updateActivityStatus(prevKey, {
-            status: "completed",
-            completedAt: new Date().toISOString(),
-            resultSummary: "Completed",
-          });
-        }
+    // Detect completions: running sessions that are no longer in the list
+    const activities = readActivitiesFromFile(200);
+    for (const activity of activities) {
+      if (activity.status !== "running" || activity.agentType === "jarvis") continue;
+      if (!currentKeys.has(activity.sessionKey)) {
+        updateActivityStatus(activity.sessionKey, {
+          status: "completed",
+          completedAt: new Date().toISOString(),
+          resultSummary: "Completed",
+        });
       }
     }
-
-    previousSessionKeys = currentKeys;
   } catch {
     // silent
   }
 }
 
-/** Start the background monitor */
 export function startSessionMonitor(): void {
   if (monitorInterval) return;
-
-  // Run immediately on start
   void ensureJarvisLogged();
   void pollAndLogActiveSessions();
-
   monitorInterval = setInterval(() => {
     void ensureJarvisLogged();
     void pollAndLogActiveSessions();
   }, POLL_INTERVAL_MS);
 }
 
-/** Stop the background monitor */
 export function stopSessionMonitor(): void {
   if (monitorInterval) {
     clearInterval(monitorInterval);
