@@ -115,3 +115,13 @@ export function readActivitiesFromFile(limit = 50): AgentActivityEntry[] {
     return [];
   }
 }
+
+/**
+ * Reset and reload the ring buffer from disk.
+ * Used after backfilling to pick up updated entries.
+ */
+export function resetRingBuffer(): void {
+  initialized = false;
+  ringBuffer = [];
+  init();
+}
