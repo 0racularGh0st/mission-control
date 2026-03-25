@@ -5,8 +5,7 @@
  * Runs on the server side, called from the activity API route on GET.
  */
 
-import { logActivity, readActivitiesFromFile } from "@/src/server/agentActivityLog";
-import type { AgentActivityEntry } from "@/src/types/agentActivity";
+import { logActivity, updateActivityStatus, readActivitiesFromFile } from "@/src/server/agentActivityLog";
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 let monitorInterval: ReturnType<typeof setInterval> | null = null;
@@ -101,6 +100,9 @@ export async function ensureJarvisLogged(): Promise<void> {
   }
 }
 
+// Track sessions seen in last poll — used to detect completions
+let previousSessionKeys = new Set<string>();
+
 /** Poll for active sessions and log any that aren't logged yet */
 export async function pollAndLogActiveSessions(): Promise<void> {
   if (Date.now() - lastPollTime < POLL_INTERVAL_MS) return;
@@ -132,6 +134,27 @@ export async function pollAndLogActiveSessions(): Promise<void> {
         });
       }
     }
+
+    // Detect completions: sessions that were running but are no longer active
+    const currentKeys = new Set(sessions.map((s) => s.sessionKey));
+    for (const prevKey of previousSessionKeys) {
+      if (!currentKeys.has(prevKey)) {
+        // Session disappeared — mark as completed
+        const activities = readActivitiesFromFile(200);
+        const running = activities.find(
+          (a) => a.sessionKey === prevKey && a.status === "running",
+        );
+        if (running) {
+          updateActivityStatus(prevKey, {
+            status: "completed",
+            completedAt: new Date().toISOString(),
+            resultSummary: "Completed",
+          });
+        }
+      }
+    }
+
+    previousSessionKeys = currentKeys;
   } catch {
     // silent
   }

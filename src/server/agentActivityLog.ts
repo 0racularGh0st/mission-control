@@ -71,6 +71,22 @@ export function logActivity(entry: AgentActivityEntry): void {
   }
 }
 
+export function updateActivityStatus(
+  sessionKey: string,
+  updates: Partial<Pick<AgentActivityEntry, "status" | "completedAt" | "durationMs" | "tokensIn" | "tokensOut" | "resultSummary" | "estimatedCostUsd">>,
+): void {
+  init();
+  // Find the running entry for this session and replace it with a completed entry
+  const idx = ringBuffer.findIndex(
+    (a) => a.sessionKey === sessionKey && a.status === "running",
+  );
+  if (idx !== -1) {
+    ringBuffer[idx] = { ...ringBuffer[idx], ...updates };
+    // Append updated entry as new line to log (replace old entry by marking it)
+    appendFileSync(LOG_FILE, JSON.stringify(ringBuffer[idx]) + "\n", "utf-8");
+  }
+}
+
 /**
  * Get recent activities from in-memory ring buffer.
  * Returns entries in reverse chronological order (most recent first).
