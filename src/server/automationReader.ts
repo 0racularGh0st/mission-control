@@ -26,11 +26,15 @@ function parseInteger(value: string | undefined | null): number | null {
 }
 
 function extractTag(body: string, tag: string): string | null {
-  const regex = new RegExp(`<key>${tag}<\\/key>\\s*<([^>]+)>([^<]*)</\\1>`, "i");
-  const match = body.match(regex);
-  if (!match) return null;
-  // For <true/> or <false/> the value is empty
-  return match[2] || (match[1].includes("true") ? "true" : "false");
+  // Check for <true/> or <false/> immediately after the key (macOS plist boolean format)
+  const trueMatch = new RegExp(`<key>${tag}<\\/key>\\s*<true\\s*/>`, "i");
+  if (trueMatch.test(body)) return "true";
+  const falseMatch = new RegExp(`<key>${tag}<\\/key>\\s*<false\\s*/>`, "i");
+  if (falseMatch.test(body)) return "false";
+  // Check for paired tags: <key>X</key><Y>value</Y>
+  const paired = new RegExp(`<key>${tag}<\\/key>\\s*<[^>]+>([^<]*)</[^>]+>`, "i");
+  const pmMatch = body.match(paired);
+  return pmMatch ? pmMatch[1] : null;
 }
 
 function extractString(body: string, tag: string): string | null {
