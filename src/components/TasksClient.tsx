@@ -183,7 +183,7 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
   useEffect(() => { fetchTasks(); }, []);
 
   const selectedTask = useMemo(
-    () => liveTasks.find((t) => t.id === selectedTaskId) ?? liveTasks[0] ?? null,
+    () => selectedTaskId !== null ? (liveTasks.find((t) => t.id === selectedTaskId) ?? null) : null,
     [liveTasks, selectedTaskId]
   );
 
