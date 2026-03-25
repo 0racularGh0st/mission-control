@@ -2,13 +2,33 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { MetricCard, Panel, SectionHeader } from "@/src/components/primitives";
+import { Panel, SectionHeader } from "@/src/components/primitives";
 import type { OpenAIAdminReportingDto } from "@/src/runtime/openaiReporting/types";
 
-type ReportingState = {
+type MiniMaxCostTrend = {
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+};
+
+type MiniMaxReportingDto = {
+  source: "live" | "mock";
+  generatedAt: string;
+  balanceUsd: number;
+  todayUsageUsd: number;
+  todayInputTokens: number;
+  todayOutputTokens: number;
+  trends7d: MiniMaxCostTrend[];
+  costPerModel: { model: string; costUsd: number; sharePct: number }[];
+  notes: string[];
+};
+
+type CostsState = {
   loading: boolean;
   error: string | null;
-  report: OpenAIAdminReportingDto | null;
+  minimaxReport: MiniMaxReportingDto | null;
+  openaiReport: OpenAIAdminReportingDto | null;
 };
 
 function formatUsd(value: number) {
@@ -20,19 +40,71 @@ function formatUsd(value: number) {
   }).format(value);
 }
 
-function formatInteger(value: number) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+function formatTokens(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`;
+  return String(value);
 }
 
-function formatPercent(value: number) {
-  return `${Math.round(Math.max(0, value) * 100)}%`;
+function asciiBarChart(values: number[], labels: string[], maxWidth = 20): string[] {
+  if (values.length === 0) return [];
+  const max = Math.max(...values, 0.01);
+  return values.map((v, i) => {
+    const barLen = Math.round((v / max) * maxWidth);
+    const bar = "█".repeat(barLen);
+    const label = labels[i] ?? "";
+    return `${label.padEnd(10)} ${bar} ${formatUsd(v)}`;
+  });
+}
+
+function CostTrendChart({ trends }: { trends: MiniMaxCostTrend[] }) {
+  const lines = useMemo(() => {
+    const costs = trends.map((t) => t.costUsd);
+    const dates = trends.map((t) => t.date.slice(5)); // MM-DD
+    return asciiBarChart(costs, dates, 18);
+  }, [trends]);
+
+  if (trends.length === 0) {
+    return <div className="text-xs text-muted-foreground">No trend data available.</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">7-day cost trend</div>
+      <div className="font-mono text-xs space-y-1">
+        {lines.map((line, i) => (
+          <div key={i} className="text-emerald-300/80">{line}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TokenBarChart({ inputTokens, outputTokens }: { inputTokens: number; outputTokens: number }) {
+  const max = Math.max(inputTokens, outputTokens, 1);
+  const inputBar = Math.round((inputTokens / max) * 20);
+  const outputBar = Math.round((outputTokens / max) * 20);
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-mono">
+        <span className="text-sky-400">IN </span>
+        {"█".repeat(inputBar).padEnd(20)} {formatTokens(inputTokens)}
+      </div>
+      <div className="text-xs font-mono">
+        <span className="text-violet-400">OUT</span>
+        {"█".repeat(outputBar).padEnd(20)} {formatTokens(outputTokens)}
+      </div>
+    </div>
+  );
 }
 
 export function CostsClient() {
-  const [state, setState] = useState<ReportingState>({
+  const [state, setState] = useState<CostsState>({
     loading: true,
     error: null,
-    report: null,
+    minimaxReport: null,
+    openaiReport: null,
   });
 
   useEffect(() => {
@@ -40,15 +112,33 @@ export function CostsClient() {
 
     const run = async () => {
       try {
-        const response = await fetch("/api/openai/reporting", { method: "GET", cache: "no-store" });
-        const payload = (await response.json()) as OpenAIAdminReportingDto;
+        // Fetch both MiniMax costs and OpenAI reporting
+        const [minimaxRes, openaiRes] = await Promise.all([
+          fetch("/api/costs", { cache: "no-store" }),
+          fetch("/api/openai/reporting", { cache: "no-store" }),
+        ]);
+
+        const [minimaxData, openaiData] = await Promise.all([
+          minimaxRes.json() as Promise<MiniMaxReportingDto>,
+          openaiRes.json() as Promise<OpenAIAdminReportingDto>,
+        ]);
 
         if (!isCancelled) {
-          setState({ loading: false, error: null, report: payload });
+          setState({
+            loading: false,
+            error: null,
+            minimaxReport: minimaxData,
+            openaiReport: openaiData,
+          });
         }
       } catch (error) {
         if (!isCancelled) {
-          setState({ loading: false, error: String(error), report: null });
+          setState({
+            loading: false,
+            error: String(error),
+            minimaxReport: null,
+            openaiReport: null,
+          });
         }
       }
     };
@@ -60,108 +150,132 @@ export function CostsClient() {
     };
   }, []);
 
-  const notes = useMemo(() => state.report?.notes ?? [], [state.report]);
-  const budgetProgress = state.report ? Math.min(Math.max(state.report.budget.progressRatio, 0), 1) : 0;
+  const { minimaxReport, openaiReport } = state;
+
+  const openaiNotes = openaiReport?.notes ?? [];
+  const minimaxNotes = minimaxReport?.notes ?? [];
 
   return (
     <div className="dashboard-shell space-y-6">
       <SectionHeader
         title="Costs"
-        description="OpenAI admin usage/cost rollup (safe server adapter with fallback when endpoints differ)."
+        description="MiniMax platform costs with 7-day trend. OpenAI admin usage also shown."
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Spend (30d)"
-          value={state.report ? formatUsd(state.report.totals.spendUsd) : state.loading ? "Loading…" : "$0.00"}
-          delta={state.report ? `Source: ${state.report.source}` : undefined}
-        />
-        <MetricCard
-          label="Input tokens"
-          value={state.report ? formatInteger(state.report.totals.inputTokens) : state.loading ? "Loading…" : "0"}
-        />
-        <MetricCard
-          label="Output tokens"
-          value={state.report ? formatInteger(state.report.totals.outputTokens) : state.loading ? "Loading…" : "0"}
-        />
-        <MetricCard
-          label="Model requests"
-          value={state.report ? formatInteger(state.report.totals.requests) : state.loading ? "Loading…" : "0"}
-        />
-      </div>
+      {state.loading && <div className="text-sm text-muted-foreground">Loading cost data…</div>}
+      {state.error && <div className="text-sm text-red-400">Error: {state.error}</div>}
 
-      {state.report ? (
-        <Panel title="Budget" description="Monthly budget progress and reset timing.">
+      {/* MiniMax Summary */}
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Panel title="MiniMax Balance">
+          {minimaxReport ? (
+            <div className="space-y-1">
+              <div className="text-2xl font-semibold">{minimaxReport.balanceUsd > 0 ? formatUsd(minimaxReport.balanceUsd) : "—"}</div>
+              <div className="text-xs text-muted-foreground">
+                {minimaxReport.source === "live" ? "Live from API" : "Estimate only"}
+              </div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm">{state.loading ? "Loading…" : "No data"}</div>
+          )}
+        </Panel>
+
+        <Panel title="Today's Usage">
+          {minimaxReport ? (
+            <div className="space-y-1">
+              <div className="text-2xl font-semibold">{formatUsd(minimaxReport.todayUsageUsd)}</div>
+              <div className="text-xs text-muted-foreground">{minimaxReport.source}</div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm">{state.loading ? "Loading…" : "No data"}</div>
+          )}
+        </Panel>
+
+        <Panel title="Input Tokens (today)">
+          {minimaxReport ? (
+            <div className="space-y-1">
+              <div className="text-2xl font-semibold">{formatTokens(minimaxReport.todayInputTokens)}</div>
+              <div className="text-xs text-muted-foreground">tokens consumed</div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm">{state.loading ? "Loading…" : "No data"}</div>
+          )}
+        </Panel>
+
+        <Panel title="Output Tokens (today)">
+          {minimaxReport ? (
+            <div className="space-y-1">
+              <div className="text-2xl font-semibold">{formatTokens(minimaxReport.todayOutputTokens)}</div>
+              <div className="text-xs text-muted-foreground">tokens generated</div>
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm">{state.loading ? "Loading…" : "No data"}</div>
+          )}
+        </Panel>
+      </section>
+
+      {/* 7-day Trend Chart */}
+      {minimaxReport && (
+        <Panel title="7-Day Trend" description="Daily spend bar chart (ASCII).">
+          <CostTrendChart trends={minimaxReport.trends7d} />
+        </Panel>
+      )}
+
+      {/* Token Breakdown */}
+      {minimaxReport && (
+        <Panel title="Token Breakdown (today)" description="Input vs output tokens.">
+          <TokenBarChart inputTokens={minimaxReport.todayInputTokens} outputTokens={minimaxReport.todayOutputTokens} />
+        </Panel>
+      )}
+
+      {/* Cost per Model */}
+      {minimaxReport && minimaxReport.costPerModel.length > 0 && (
+        <Panel title="Cost by Model" description="Today's spend breakdown by model.">
+          <div className="space-y-2">
+            {minimaxReport.costPerModel.map((row) => (
+              <div key={row.model} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 text-sm">
+                <span className="font-medium">{row.model}</span>
+                <div className="text-right">
+                  <div className="font-medium">{formatUsd(row.costUsd)}</div>
+                  <div className="text-xs text-muted-foreground">{row.sharePct}% of spend</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {/* OpenAI Reporting (existing) */}
+      {openaiReport && (
+        <Panel title="OpenAI Admin (30d)" description="Separate OpenAI org usage/cost rollup.">
           <div className="space-y-3 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="font-semibold">Current spend:</span> {formatUsd(state.report.budget.spendUsd)}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border/60 bg-background/35 px-3 py-2">
+                <div className="text-xs text-muted-foreground">Spend (30d)</div>
+                <div className="text-lg font-semibold">{formatUsd(openaiReport.totals.spendUsd)}</div>
               </div>
-              <div>
-                <span className="font-semibold">Budget:</span>{" "}
-                {state.report.budget.configured ? formatUsd(state.report.budget.budgetUsd) : "Not configured"}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1 flex items-center justify-between text-xs text-muted">
-                <span>Progress</span>
-                <span>{state.report.budget.configured ? formatPercent(state.report.budget.progressRatio) : "0%"}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted/30">
-                <div className="h-full rounded-full bg-blue-400 transition-all" style={{ width: `${budgetProgress * 100}%` }} />
+              <div className="rounded-lg border border-border/60 bg-background/35 px-3 py-2">
+                <div className="text-xs text-muted-foreground">Requests</div>
+                <div className="text-lg font-semibold">{openaiReport.totals.requests.toLocaleString()}</div>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-              <span>
-                Resets {new Date(state.report.budget.resetAt).toLocaleString()} ({state.report.budget.resetInDays}d)
-              </span>
-              <span>
-                Remaining: {state.report.budget.configured ? formatUsd(state.report.budget.remainingUsd) : "n/a"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
-              <span className="text-xs text-muted">{state.report.budget.editHint}</span>
-              <button
-                type="button"
-                className="rounded-md border border-white/15 px-3 py-1.5 text-xs text-muted transition hover:bg-white/5"
-                disabled
-                title="Budget editing UI placeholder"
-              >
-                Edit budget (soon)
-              </button>
+            <div className="text-xs text-muted">
+              Source: {openaiReport.source} · Generated: {new Date(openaiReport.generatedAt).toLocaleTimeString()}
             </div>
           </div>
         </Panel>
-      ) : null}
+      )}
 
-      <Panel title="Endpoint health" description="Server-side integration status (secrets are never exposed to the browser).">
-        {state.error ? <div className="text-sm text-red-400">Failed to load reporting route: {state.error}</div> : null}
-
-        {state.report ? (
-          <div className="space-y-2 text-sm">
-            <div>
-              <strong>Costs:</strong> {state.report.endpoints.costs.ok ? "ok" : "fallback"} (status {state.report.endpoints.costs.status || "n/a"})
-            </div>
-            <div>
-              <strong>Usage:</strong> {state.report.endpoints.usage.ok ? "ok" : "fallback"} (status {state.report.endpoints.usage.status || "n/a"})
-            </div>
-            <div className="text-muted">Generated: {new Date(state.report.generatedAt).toLocaleString()}</div>
-          </div>
-        ) : null}
-      </Panel>
-
-      {notes.length ? (
-        <Panel title="Notes" description="Fallback context and integration diagnostics.">
-          <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-            {notes.map((note) => (
-              <li key={note}>{note}</li>
+      {/* Notes */}
+      {(minimaxNotes.length > 0 || openaiNotes.length > 0) && (
+        <Panel title="Diagnostics">
+          <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+            {[...minimaxNotes, ...openaiNotes].map((note, i) => (
+              <li key={i}>{note}</li>
             ))}
           </ul>
         </Panel>
-      ) : null}
+      )}
     </div>
   );
 }

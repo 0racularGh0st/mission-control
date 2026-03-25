@@ -23,7 +23,6 @@ const PREVIEW_LINES = 20;
 
 async function readFilePreview(filePath: string, maxLines = PREVIEW_LINES): Promise<string> {
   try {
-    const stat = await fs.stat(filePath);
     const content = await fs.readFile(filePath, "utf-8");
     const lines = content.split("\n").slice(0, maxLines);
     return lines.join("\n");

@@ -11,18 +11,8 @@ import type {
   TaskQueueLaneDto,
 } from "./types";
 
-const OPENCLAW_CONFIG = "/Users/nigel/.openclaw/openclaw.json";
 const RUNTIME_DIR = path.join(process.cwd(), ".runtime");
 const DASHBOARD_EVENTS_FILE = path.join(RUNTIME_DIR, "dashboard-events.ndjson");
-
-async function readOpenClawConfig() {
-  try {
-    const raw = await fs.readFile(OPENCLAW_CONFIG, "utf-8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
 
 async function readRecentLogs(count = 20): Promise<RuntimeLogEntryDto[]> {
   try {
@@ -106,10 +96,7 @@ function buildSnapshot(source: DashboardSnapshotDto["source"]): DashboardSnapsho
     severity: "warning",
   });
 
-  // Token cost from MiniMax cost config
-  const minimaxModels = [
-    { model: "MiniMax-M2.7", inputCost: 0.3, outputCost: 1.2 },
-  ];
+  // Token cost from task-based estimate (MiniMax pricing)
   const totalInputTokens = tasks.length * 1200;
   const totalOutputTokens = tasks.length * 800;
   const totalCostUsd = (totalInputTokens / 1000) * 0.3 + (totalOutputTokens / 1000) * 1.2;

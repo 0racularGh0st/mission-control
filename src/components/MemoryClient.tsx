@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Clock3, FileText, HardDrive, ScrollText } from "lucide-react";
 
 import { Panel, SectionHeader } from "@/src/components/primitives";
-import { cn } from "@/lib/utils";
 
 type MemoryEntryType = "daily" | "longterm" | "obsidian";
 
