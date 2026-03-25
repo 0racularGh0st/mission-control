@@ -91,6 +91,28 @@ export async function ensureJarvisLogged(): Promise<void> {
   }
 }
 
+/**
+ * Log a subagent dispatch with its real task description.
+ * Call this when spawning a subagent so the log has meaningful descriptions.
+ */
+export function logSubagentDispatch(sessionKey: string, taskDescription: string, model = "MiniMax-M2.7"): void {
+  logActivity({
+    id: `subagent-${idCounter++}`,
+    sessionKey,
+    agentType: "subagent",
+    model,
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    durationMs: 0,
+    tokensIn: 0,
+    tokensOut: 0,
+    taskDescription,
+    status: "running",
+    resultSummary: "Active",
+    estimatedCostUsd: 0,
+  });
+}
+
 export async function pollAndLogActiveSessions(): Promise<void> {
   if (Date.now() - lastPollTime < POLL_INTERVAL_MS) return;
   lastPollTime = Date.now();
@@ -100,30 +122,7 @@ export async function pollAndLogActiveSessions(): Promise<void> {
     const sessions = parseOpenclawSessions(stdout);
     const currentKeys = new Set(sessions.map((s) => s.sessionKey));
 
-    // Log new sessions that aren't tracked yet
-    for (const session of sessions) {
-      if (session.agentType === "jarvis") continue;
-
-      if (!hasRecentRunningEntry(session.sessionKey, POLL_INTERVAL_MS * 2)) {
-        logActivity({
-          id: `${session.agentType}-${idCounter++}`,
-          sessionKey: session.sessionKey,
-          agentType: session.agentType,
-          model: session.model || "MiniMax-M2.7",
-          startedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          durationMs: 0,
-          tokensIn: 0,
-          tokensOut: 0,
-          taskDescription: `${session.agentType} session active`,
-          status: "running",
-          resultSummary: "Active",
-          estimatedCostUsd: 0,
-        });
-      }
-    }
-
-    // Detect completions: running sessions that are no longer in the list
+    // Only detect completions for subagents — spawns are logged via logSubagentDispatch()
     const activities = readActivitiesFromFile(200);
     for (const activity of activities) {
       if (activity.status !== "running" || activity.agentType === "jarvis") continue;
@@ -131,7 +130,7 @@ export async function pollAndLogActiveSessions(): Promise<void> {
         updateActivityStatus(activity.sessionKey, {
           status: "completed",
           completedAt: new Date().toISOString(),
-          resultSummary: "Completed",
+          resultSummary: activity.resultSummary !== "Active" ? activity.resultSummary : "Completed",
         });
       }
     }

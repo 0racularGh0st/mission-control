@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logActivity, updateActivityStatus, readActivitiesFromFile } from "@/src/server/agentActivityLog";
-import { ensureJarvisLogged, pollAndLogActiveSessions } from "@/src/server/sessionMonitor";
+import { ensureJarvisLogged, pollAndLogActiveSessions, logSubagentDispatch } from "@/src/server/sessionMonitor";
 import type { AgentActivityEntry } from "@/src/types/agentActivity";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // Poll OpenClaw sessions immediately on every request — client polling drives the monitor
     await ensureJarvisLogged();
     await pollAndLogActiveSessions();
 
-    // Deduplicate by id — use sessionKey+startedAt as fallback key
     const seen = new Set<string>();
-    const activities = (readActivitiesFromFile(200) as AgentActivityEntry[]).filter((a) => {
+    const activities = (readActivitiesFromFile(200)).filter((a) => {
       const key = a.id || `${a.sessionKey}::${a.startedAt}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     }).slice(0, 50);
+
     return NextResponse.json(
       { activities },
       {
@@ -40,6 +39,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // Subagent dispatch: log with real task description
+    if (body.type === "subagent-dispatch") {
+      logSubagentDispatch(body.sessionKey, body.taskDescription, body.model ?? "MiniMax-M2.7");
+      return NextResponse.json({ success: true });
+    }
+
     logActivity(body as AgentActivityEntry);
     return NextResponse.json({ success: true });
   } catch (error) {
