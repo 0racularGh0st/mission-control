@@ -116,22 +116,27 @@ export function useDashboardRuntime({ initialRuntime, cursorStorageKey }: { init
     };
 
     const pollOnce = async () => {
-      const runtime = await fetchRuntime(cursorRef.current);
-      setRuntimeMeta({
-        source: runtime.source,
-        transport: runtime.transport,
-        recommendedPollMs: runtime.recommendedPollMs,
-        incrementalSupported: runtime.incrementalSupported,
-        ssePath: runtime.ssePath,
-      });
+      try {
+        const runtime = await fetchRuntime(cursorRef.current);
+        setRuntimeMeta({
+          source: runtime.source,
+          transport: runtime.transport,
+          recommendedPollMs: runtime.recommendedPollMs,
+          incrementalSupported: runtime.incrementalSupported,
+          ssePath: runtime.ssePath,
+        });
 
-      if (!runtime.incrementalSupported || runtime.updates.length === 0) {
-        setSnapshot(runtime.snapshot);
-      } else {
-        setSnapshot((prev) => runtime.updates.reduce((acc, patch) => applyDashboardPatch(acc, patch), prev));
+        if (!runtime.incrementalSupported || runtime.updates.length === 0) {
+          setSnapshot(runtime.snapshot);
+        } else {
+          setSnapshot((prev) => runtime.updates.reduce((acc, patch) => applyDashboardPatch(acc, patch), prev));
+        }
+
+        persistCursor(runtime.cursor);
+      } catch (err) {
+        // fetch failed — silent fail, keep previous snapshot
+        console.warn("[useDashboardRuntime] poll failed:", err);
       }
-
-      persistCursor(runtime.cursor);
     };
 
     if (runtimeMeta.incrementalSupported && runtimeMeta.ssePath) {
@@ -179,7 +184,7 @@ export function useDashboardRuntime({ initialRuntime, cursorStorageKey }: { init
       });
 
       source.addEventListener("error", () => {
-        void pollOnce();
+        // SSE error — silently fall back to polling, don't throw
       });
 
       return () => {
