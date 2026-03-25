@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  Command,
   CommandDialog,
   CommandInput,
   CommandList,
@@ -122,21 +123,23 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Type a command or search…" autoFocus />
-      <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
-        {Object.entries(grouped).map(([group, items]) => (
-          <CommandGroup key={group} heading={group}>
-            {items.map((cmd) => (
-              <CommandItem key={cmd.id} value={cmd.label} onSelect={cmd.action}>
-                {cmd.icon}
-                <span>{cmd.label}</span>
-                {cmd.shortcut && <CommandShortcut>{cmd.shortcut}</CommandShortcut>}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ))}
-      </CommandList>
+      <Command>
+        <CommandInput placeholder="Type a command or search…" autoFocus />
+        <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
+          {Object.entries(grouped).map(([group, items]) => (
+            <CommandGroup key={group} heading={group}>
+              {items.map((cmd) => (
+                <CommandItem key={cmd.id} value={cmd.label} onSelect={cmd.action}>
+                  {cmd.icon}
+                  <span>{cmd.label}</span>
+                  {cmd.shortcut && <CommandShortcut>{cmd.shortcut}</CommandShortcut>}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </Command>
     </CommandDialog>
   );
 }
