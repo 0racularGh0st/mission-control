@@ -11,7 +11,14 @@ export async function GET() {
     await ensureJarvisLogged();
     await pollAndLogActiveSessions();
 
-    const activities = readActivitiesFromFile(50) as AgentActivityEntry[];
+    // Deduplicate by id — use sessionKey+startedAt as fallback key
+    const seen = new Set<string>();
+    const activities = (readActivitiesFromFile(200) as AgentActivityEntry[]).filter((a) => {
+      const key = a.id || `${a.sessionKey}::${a.startedAt}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 50);
     return NextResponse.json(
       { activities },
       {

@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile);
 const POLL_INTERVAL_MS = 30_000;
 let monitorInterval: ReturnType<typeof setInterval> | null = null;
 let lastPollTime = 0;
+let idCounter = Date.now();
 
 interface ParsedSession {
   sessionKey: string;
@@ -70,7 +71,7 @@ export async function ensureJarvisLogged(): Promise<void> {
 
     if (jarvisSession && !hasRecentRunningEntry(jarvisSession.sessionKey, 60 * 60 * 1000)) {
       logActivity({
-        id: `jarvis-${Date.now()}`,
+        id: `jarvis-${idCounter++}`,
         sessionKey: jarvisSession.sessionKey,
         agentType: "jarvis",
         model: jarvisSession.model || "MiniMax-M2.7",
@@ -105,7 +106,7 @@ export async function pollAndLogActiveSessions(): Promise<void> {
 
       if (!hasRecentRunningEntry(session.sessionKey, POLL_INTERVAL_MS * 2)) {
         logActivity({
-          id: `${session.agentType}-${Date.now()}`,
+          id: `${session.agentType}-${idCounter++}`,
           sessionKey: session.sessionKey,
           agentType: session.agentType,
           model: session.model || "MiniMax-M2.7",
