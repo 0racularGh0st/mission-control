@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AgentActivityEntry } from "@/src/types/agentActivity";
 
 export type AgentState = "idle" | "busy" | "thinking";
