@@ -285,14 +285,14 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
                     <button key={card.id} type="button" onClick={() => setSelectedTaskId(card.id)} className="w-full text-left">
                       <Card className="border-border/70 bg-background/55 p-4 transition hover:border-primary/40 hover:bg-background/80">
                         <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="font-medium text-foreground">{card.title}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">{card.id}</div>
+                          <div className="flex flex-col gap-1">
+                            <div className="font-medium text-foreground">{card.title}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{card.id}</span>
+                              <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide", laneTone(card.lane))}>
+                                {card.status}
+                              </span>
                             </div>
-                            <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide", laneTone(card.lane))}>
-                              {card.status}
-                            </span>
                           </div>
                           <p className="line-clamp-2 text-sm text-muted-foreground">{card.summary}</p>
                           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
