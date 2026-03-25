@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { cn } from "@/lib/utils";
 
 type PanelProps = React.ComponentProps<typeof Card> & {
-  title?: string;
+  title?: React.ReactNode;
   description?: string;
 };
 
