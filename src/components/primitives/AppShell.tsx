@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { CommandPalette } from "@/src/components/CommandPalette";
+
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/src/components/primitives/CommandBar";
 import { Panel } from "@/src/components/primitives/Panel";
@@ -24,6 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <CommandPalette />
       <div className="mx-auto grid min-h-screen w-full max-w-[1600px] grid-cols-1 gap-3 p-3 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
         <aside className="glass-panel hidden rounded-xl p-3 xl:block">
           <div className="mb-3 px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
