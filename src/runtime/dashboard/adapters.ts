@@ -1,4 +1,4 @@
-import { FileBackedLocalDashboardTransport, type DashboardLocalTransport } from "./localTransport";
+import { RealDashboardAdapter } from "./realAdapter";
 import type { DashboardRuntimeStateDto, DashboardSnapshotDto, RuntimeLogEntryDto, RuntimeSource } from "./types";
 
 interface DashboardRuntimeAdapter {
@@ -99,50 +99,22 @@ class MockDashboardAdapter implements DashboardRuntimeAdapter {
   }
 }
 
-class LocalDashboardAdapter implements DashboardRuntimeAdapter {
-  constructor(private readonly transport: DashboardLocalTransport = new FileBackedLocalDashboardTransport(mockSnapshot)) {}
-
-  async getSnapshot(): Promise<DashboardSnapshotDto> {
-    return this.transport.readSnapshot();
-  }
-
-  async getRuntimeState(cursor?: string): Promise<DashboardRuntimeStateDto> {
-    const snapshot = await this.getSnapshot();
-    const latestCursor = await this.transport.issueCursor(snapshot);
-
-    return {
-      transport: "poll",
-      source: "local",
-      cursor: latestCursor,
-      recommendedPollMs: 2_000,
-      incrementalSupported: true,
-      ssePath: "/api/runtime/dashboard/stream",
-      snapshot,
-      updates: await this.transport.readUpdates(cursor),
-    };
-  }
-}
-
 function resolveRuntimeSource(): RuntimeSource {
   const value = process.env.MISSION_CONTROL_RUNTIME_SOURCE;
-  return value === "local" ? "local" : "mock";
+  if (value === "local" || value === "real") return "local";
+  return "mock";
 }
 
 export function getDashboardAdapter(): DashboardRuntimeAdapter {
   const source = resolveRuntimeSource();
   if (source === "local") {
-    return new LocalDashboardAdapter();
+    return new RealDashboardAdapter();
   }
   return new MockDashboardAdapter();
 }
 
 export async function getDashboardSnapshot() {
   const adapter = getDashboardAdapter();
-
-  if (resolveRuntimeSource() !== "local") {
-    return adapter.getSnapshot();
-  }
-
   try {
     return await adapter.getSnapshot();
   } catch {
@@ -152,11 +124,6 @@ export async function getDashboardSnapshot() {
 
 export async function getDashboardRuntimeState(cursor?: string) {
   const adapter = getDashboardAdapter();
-
-  if (resolveRuntimeSource() !== "local") {
-    return adapter.getRuntimeState(cursor);
-  }
-
   try {
     return await adapter.getRuntimeState(cursor);
   } catch {
