@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Flag, Plus, Trash2, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -181,6 +181,57 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
   }
 
   useEffect(() => { fetchTasks(); }, []);
+
+  // Connect to task SSE stream for live updates
+  useEffect(() => {
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    function connect() {
+      source = new EventSource("/api/tasks/stream");
+
+      source.addEventListener("snapshot", (event) => {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { tasks: Task[] };
+        setLiveTasks(payload.tasks ?? []);
+        setLoading(false);
+      });
+
+      source.addEventListener("task.created", (event) => {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { task: Task };
+        setLiveTasks((prev) => {
+          if (prev.find((t) => t.id === payload.task.id)) return prev;
+          return [...prev, payload.task];
+        });
+      });
+
+      source.addEventListener("task.updated", (event) => {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { task: Task };
+        setLiveTasks((prev) => prev.map((t) => (t.id === payload.task.id ? payload.task : t)));
+      });
+
+      source.addEventListener("task.moved", (event) => {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { task: Task };
+        setLiveTasks((prev) => prev.map((t) => (t.id === payload.task.id ? payload.task : t)));
+      });
+
+      source.addEventListener("task.deleted", (event) => {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { taskId: string };
+        setLiveTasks((prev) => prev.filter((t) => t.id !== payload.taskId));
+      });
+
+      source.addEventListener("error", () => {
+        source?.close();
+        reconnectTimer = setTimeout(connect, 3000);
+      });
+    }
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      source?.close();
+    };
+  }, []);
 
   const selectedTask = useMemo(
     () => selectedTaskId !== null ? (liveTasks.find((t) => t.id === selectedTaskId) ?? null) : null,

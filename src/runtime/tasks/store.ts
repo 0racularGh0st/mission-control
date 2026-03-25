@@ -1,6 +1,8 @@
 // In-memory task store — lives in module scope (resets on server restart)
 // For production: replace with a DB adapter
 
+import { emitTaskEvent } from "./eventsBus";
+
 export type TaskLane = "now" | "next" | "review" | "blocked" | "done";
 export type TaskPriority = "P0" | "P1" | "P2" | "P3";
 export type TaskStatus = "queued" | "in progress" | "blocked" | "awaiting review" | "done";
@@ -113,6 +115,7 @@ export function createTask(data: Omit<Task, "id" | "createdAt" | "updatedAt">): 
     updatedAt: new Date().toISOString(),
   };
   tasks.push(task);
+  emitTaskEvent({ type: "task.created", taskId: task.id, task });
   return task;
 }
 
@@ -120,13 +123,16 @@ export function updateTask(id: string, data: Partial<Omit<Task, "id" | "createdA
   const idx = tasks.findIndex((t) => t.id === id);
   if (idx === -1) return null;
   tasks[idx] = { ...tasks[idx], ...data, updatedAt: new Date().toISOString() };
-  return tasks[idx];
+  const updated = tasks[idx];
+  emitTaskEvent({ type: "task.updated", taskId: id, task: updated });
+  return updated;
 }
 
 export function deleteTask(id: string): boolean {
   const idx = tasks.findIndex((t) => t.id === id);
   if (idx === -1) return false;
   tasks.splice(idx, 1);
+  emitTaskEvent({ type: "task.deleted", taskId: id });
   return true;
 }
 
@@ -138,5 +144,9 @@ export function moveTask(id: string, lane: TaskLane): Task | null {
     blocked: "blocked",
     done: "done",
   };
-  return updateTask(id, { lane, status: statusMap[lane] });
+  const updated = updateTask(id, { lane, status: statusMap[lane] });
+  if (updated) {
+    emitTaskEvent({ type: "task.moved", taskId: id, task: updated, lane });
+  }
+  return updated;
 }
