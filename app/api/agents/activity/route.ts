@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logActivity, updateActivityStatus, readActivitiesFromFile } from "@/src/server/agentActivityLog";
-import { ensureJarvisLogged, pollAndLogActiveSessions, logSubagentDispatch } from "@/src/server/sessionMonitor";
+import { pollAndLogActiveSessions, logSubagentDispatch } from "@/src/server/sessionMonitor";
 import type { AgentActivityEntry } from "@/src/types/agentActivity";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await ensureJarvisLogged();
     await pollAndLogActiveSessions();
 
+    // Deduplicate by sessionKey — keep only the most recent entry per session
     const seen = new Set<string>();
-    const activities = (readActivitiesFromFile(200)).filter((a) => {
-      const key = a.id || `${a.sessionKey}::${a.startedAt}`;
+    const activities = readActivitiesFromFile(200).filter((a) => {
+      const key = a.sessionKey;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Subagent dispatch: log with real task description
     if (body.type === "subagent-dispatch") {
       logSubagentDispatch(body.sessionKey, body.taskDescription, body.model ?? "MiniMax-M2.7");
       return NextResponse.json({ success: true });

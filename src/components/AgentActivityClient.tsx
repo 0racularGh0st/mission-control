@@ -114,11 +114,13 @@ export function AgentActivityClient() {
                       {formatTime(entry.startedAt)}
                     </td>
                     <td className={`py-2 pr-4 font-medium ${AGENT_COLORS[entry.agentType] ?? "text-foreground"}`}>
-                      {entry.agentType === "subagent" &&
-                      (entry.taskDescription.toLowerCase().includes("cody") ||
-                        entry.taskDescription.toLowerCase().includes("missioncontrol"))
-                        ? "Cody"
-                        : entry.agentType}
+                      {entry.agentType === "jarvis"
+                        ? "Jarvis"
+                        : entry.agentType === "cody"
+                          ? "Cody"
+                          : entry.agentType === "sandra"
+                            ? "Sandra"
+                            : "Subagent"}
                     </td>
                     <td className="py-2 pr-4 text-xs whitespace-nowrap">
                       {entry.model}
