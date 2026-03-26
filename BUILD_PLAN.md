@@ -1,21 +1,21 @@
-# Mission Control — Refined Build Plan
+# Mission Control — Build Plan
 
 ## Product Goal
-Build a production-grade **AI Mission Control OS**: a keyboard-first, dark-only command center for orchestrating agents, routing tasks between models, watching logs in real time, inspecting memory/prompts, and tracking token/cost usage.
+Production-grade **AI Mission Control OS**: a keyboard-first, dark-only command center for orchestrating agents, routing tasks between models, watching logs in real time, inspecting memory/prompts, and tracking token/cost usage.
 
 Design direction:
-- **Raycast** → dense, keyboard-first command surfaces
-- **Linear** → spacing, hierarchy, restraint
-- **Vercel Dashboard** → operational clarity, cards, monitoring
-- **Notion** → modular composition and calm layout
+- **Raycast** — dense, keyboard-first command surfaces
+- **Linear** — spacing, hierarchy, restraint
+- **Vercel Dashboard** — operational clarity, cards, monitoring
+- **Notion** — modular composition and calm layout
 
 Core stack:
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- **shadcn/ui as the default component system**
-- Zustand (or equivalent) for client state when needed
-- SSE/WebSocket-ready log surfaces
+- Next.js 16 (App Router)
+- TypeScript 5
+- Tailwind CSS v4 (CSS-first config)
+- shadcn/ui (component system)
+- Lucide React (icons)
+- SSE for real-time streaming
 
 Non-negotiables:
 - Commit to **main only**
@@ -23,330 +23,209 @@ Non-negotiables:
 - Jarvis/openclaw/routing/personal configs stay in workspace-level files
 - Use `@/components/ui/<component>` imports for shadcn components
 - Dev port: **3003**
+- Dark-only — no light mode
 
 ---
 
-## Current Reality Check
-Before building features, the foundation must be corrected:
-- shadcn is **not fully installed/wired correctly yet**
-- the current scaffold needs a proper design-system-first setup
-- model routing config belongs to workspace/OpenClaw, not this repo
-- we should build the UI shell only after the shadcn layer is stable
+## Current State
 
-So the revised plan below is stricter and more implementation-ready.
+The MVP is substantially complete. All core pages, API routes, server readers, and runtime infrastructure are built. The app runs on port 3003 with a full dark theme, keyboard navigation, and real-time SSE streaming.
 
----
+### Architecture
 
-## Phase 0 — Foundation Reset (Immediate)
-Objective: make the repo a clean, dependable product foundation.
+```
+app/                          Next.js App Router (server components)
+├── api/                      11 API endpoints
+├── styles/tokens.css         OKLch design tokens (Jarvis Dark)
+src/
+├── components/               Client components + primitives
+│   └── primitives/           AppShell, Panel, CommandBar, MetricCard, SectionHeader
+├── viewmodels/               State/logic hooks per page
+├── runtime/                  Dashboard adapter pattern (mock/real switching)
+│   └── tasks/                In-memory task store + event bus
+├── server/                   Server-side data readers
+└── types/                    Shared TypeScript types
+components/ui/                shadcn primitives
+```
 
-### Tasks
-1. Verify/create clean Next.js scaffold in repo root
-2. Properly initialize shadcn with the provided preset
-3. Ensure generated files are correct:
-   - `components.json`
-   - `app/globals.css`
-   - alias support in `tsconfig.json`
-   - proper Tailwind content wiring
-4. Install required base UI dependencies
-5. Confirm the following work before any feature building:
-   - `npx shadcn@latest add button` works
-   - components generate under `components/ui/`
-   - app runs on port 3003
+### Data flow
+Server component (SSR fetch) → `*Client.tsx` (hydration) → ViewModel hook (transform) → UI render. Real-time updates via `useDashboardRuntime` hook polling SSE streams.
 
-### Deliverables
-- working Next app
-- shadcn initialized and functional
-- button/card/input/dialog installable without friction
-- clean base commit on `main`
+### Runtime adapter pattern
+`MISSION_CONTROL_RUNTIME_SOURCE` env var switches between `"mock"` (default) and `"local"` (real adapter reading workspace data).
 
 ---
 
-## Phase 1 — Design System (Jarvis UI Core)
-Objective: establish a reusable visual system before screens.
+## Phase 0 — Foundation Reset ✅ COMPLETE
 
-### Tasks
-1. Create dark-first token layer:
-   - `app/styles/tokens.css`
-2. Define:
-   - background
-   - panel/surface
-   - border
-   - text tiers
-   - accent
-   - spacing scale: `4, 8, 12, 16, 24, 32`
-   - radii and elevation
-3. Wire tokens into Tailwind theme
-4. Create theme/provider plumbing
-5. Add utility classes for:
-   - glass panels
-   - muted text
-   - accent glow
-   - dashboard shells
+- Next.js 16 scaffold with App Router
+- shadcn initialized (`components.json`, `@/` alias, Tailwind content wiring)
+- Base dependencies installed (radix-ui, cmdk, cva, clsx, tailwind-merge)
+- App runs on port 3003
 
-### Deliverables
-- `tokens.css`
-- Tailwind theme mapping
-- Theme provider
-- stable dark-only visual foundation
+## Phase 1 — Design System ✅ COMPLETE
 
----
+- `app/styles/tokens.css` — full OKLch color system (Jarvis Dark theme)
+- `tailwind.config.cjs` — extended with `jarvis` color palette
+- `ThemeProvider` component wired into root layout
+- Utility classes: `glass-panel`, `accent-glow`, `dashboard-shell`, `text-muted`, `panel`
+- `globals.css` with Tailwind v4 `@theme` inline syntax
 
-## Phase 2 — shadcn Primitive Layer
-Objective: create the reusable UI building blocks.
+## Phase 2 — shadcn Primitive Layer ✅ COMPLETE
 
-### Required shadcn components
-Install and standardize at least:
-- button
-- card
-- input
-- textarea
-- dialog
-- dropdown-menu
-- tabs
-- badge
-- table
-- scroll-area
-- separator
-- sheet
-- skeleton
-- tooltip
-- command
+### Installed shadcn components
+- button, card, input, input-group, textarea, dialog, command
 
-### Tasks
-1. Install missing shadcn components via CLI
-2. Create thin wrappers/compositions only where needed
-3. Build shared primitives:
-   - `AppShell`
-   - `Panel`
-   - `MetricCard`
-   - `SectionHeader`
-   - `CommandBar`
-4. Keep styling restrained and compositional
+### Not yet installed (install as needed)
+- dropdown-menu, tabs, badge, table, scroll-area, separator, sheet, skeleton, tooltip
 
-### Deliverables
-- stable `components/ui/*`
-- reusable higher-level dashboard primitives
-- no ad-hoc random styling everywhere
+### Custom primitives built
+- `AppShell` — 3-column layout (sidebar, main, inspector)
+- `Panel` — card wrapper with title/description
+- `CommandBar` — command palette trigger + search
+- `MetricCard` — KPI display
+- `SectionHeader` — title + description + action slot
 
----
+## Phase 3 — App Shell ✅ COMPLETE
 
-## Phase 3 — Information Architecture + App Shell
-Objective: create the structural layout of Mission Control.
+- Persistent 3-column layout: left sidebar, main content, right inspector skeleton
+- Sidebar nav: Dashboard, Agents, Tasks, Logs, Memory, Models, Costs, Settings, Office, Automations
+- `Cmd+K` command palette (Raycast-style, `CommandPalette.tsx`)
+- Keyboard shortcut hints
+- Geist font loaded via Google Fonts
+- `data-theme="jarvis-dark"` + `dark` class on root
 
-### Main layout
-- **Left Sidebar**
-  - Dashboard
-  - Agents
-  - Tasks
-  - Logs
-  - Memory
-  - Models
-  - Costs
-  - Settings
-- **Top Command Bar**
-  - global search / command input
-  - quick actions
-  - keyboard-first entry
-- **Main Content Grid**
-- **Right Inspector**
-  - contextual detail pane
+## Phase 4 — Dashboard v1 ✅ COMPLETE
 
-### Tasks
-1. Build persistent app shell
-2. Add responsive layout behavior
-3. Add keyboard shortcut hints
-4. Add `Cmd+K` command palette shell
+- `DashboardClient.tsx` — metrics grid, active agents, task queue snapshot, alerts
+- SSR fetch via `getDashboardRuntimeState()` → client hydration
+- Real-time polling via `useDashboardRuntime` hook
+- `useDashboardViewModel` transforms runtime DTO into displayable metrics
+- Mock adapter provides realistic placeholder data
 
-### Deliverables
-- navigable shell
-- sidebar/topbar/inspector layout
-- keyboard-first UX foundation
+## Phase 5 — Model Routing Surface ✅ COMPLETE
+
+- `/models` page with routing matrix and fallback logic
+- Per-model performance metrics display
+- `routingReader.ts` reads workspace-level routing config
+- Repo stays clean of personal routing config
+
+## Phase 6 — Agents + Task Queue ✅ COMPLETE
+
+- `/agents` page with status indicators and health info
+- `AgentActivityClient` — real-time activity timeline
+- `agentsReader.ts` reads agent configs from workspace
+- `agentActivityLog.ts` parses `.runtime/agent-activity.log`
+- `sessionMonitor.ts` monitors agent session health
+- `/tasks` page — full Kanban board (Now/Next/Review/Blocked/Done lanes) with detail modals
+- In-memory task store (`src/runtime/tasks/store.ts`) with CRUD + event bus
+- SSE stream at `/api/tasks/stream` for live task updates
+
+## Phase 7 — Logs + Memory Inspector ✅ COMPLETE
+
+- `/logs` page with filtering by agent/task/model
+- `LogsClient.tsx` + `useLogsViewModel` for log formatting
+- `/memory` page with file browser and syntax highlighting
+- `memoryReader.ts` scans and indexes memory files
+- Read-only inspection as planned
+
+## Phase 8 — Cost + Usage Analytics ✅ COMPLETE
+
+- `/costs` page with per-model breakdown, daily totals, trend visualization
+- `CostsClient.tsx` — cost charts, trend analysis, per-model breakdown
+- `minimaxReporting.ts` — MiniMax API integration for token costs
+- `openaiAdminReporting.ts` — OpenAI Admin API integration
+- `/api/openai/reporting` endpoint
+
+## Phase 9 — QA + Hardening ⚠️ IN PROGRESS
+
+### Done
+- Playwright configured (`playwright.config.ts`)
+- Keyboard navigation functional
+- ESLint + TypeScript strict checking (`npm run lint`, `npm run tsc-lint`)
+- Husky git hooks set up
+
+### Remaining
+- [ ] Write E2E smoke tests (Playwright — `tests/` directory is empty)
+- [ ] Add UI regression checks
+- [ ] Verify responsive behavior across breakpoints
+- [ ] Verify all shadcn components remain canonical
+- [ ] Audit hydration/layout issues
+- [ ] Add error boundaries for runtime failures
 
 ---
 
-## Phase 4 — Dashboard v1
-Objective: make the landing screen feel like a real operational center.
+## Additional Surfaces (Built Outside Original Plan)
 
-### Dashboard sections
-- Active agents
-- Task queue snapshot
-- Token/cost summary
-- Model routing summary
-- Recent logs
-- Alerts / stuck tasks
+### /office — Agent Office Visualization ✅ COMPLETE
+Pixel-art canvas (`OfficeCanvas.tsx`, 433 lines) showing agents moving between rooms. `useOfficeViewModel` tracks agent positions. Not in the original plan but fully functional.
 
-### Tasks
-1. Build dashboard cards with strong hierarchy
-2. Use placeholder/mock operational data initially
-3. Prioritize legibility and scanning speed
-4. Avoid clutter and decorative noise
+### /automations — Automation Rules ⚠️ PARTIAL
+- `AutomationsClient.tsx` — rule builder UI with execution history display
+- `automationReader.ts` — reads automation rules from filesystem
+- `/api/automations` — GET/POST endpoint
+- **Missing:** backend rule execution engine; rules can be defined but don't run
 
-### Deliverables
-- polished dashboard homepage
-- visually coherent command center feel
+### /settings ❌ SCAFFOLDED ONLY
+- `app/settings/page.tsx` exists but renders an empty placeholder
+- No settings UI built yet
+
+### Right Inspector Panel ⚠️ SKELETON ONLY
+- Slot exists in `AppShell` layout (third column)
+- No contextual content wired — clicking items does not populate the inspector
 
 ---
 
-## Phase 5 — Model Routing Surface
-Objective: expose model orchestration clearly.
+## What's Next
 
-### Tasks
-1. Build UI for:
-   - selected/default model
-   - routing policy summary
-   - fallbacks
-   - task → model mapping
-2. Visualize route flow:
-   - input
-   - router decision
-   - selected model
-   - fallback path
-3. Pull routing data from workspace-level config or mocked adapter
-4. Keep repo free of personal routing config
+### Priority 1 — Complete Phase 9 (QA)
+- Write Playwright smoke tests covering core navigation and page loads
+- Add error boundaries around runtime data fetching
+- Audit hydration warnings
 
-### Deliverables
-- models page
-- routing panel
-- route visualization cards/flow
+### Priority 2 — Inspector Panel
+- Wire right inspector to show contextual detail when selecting agents, tasks, logs
+- Support keyboard-driven focus (select item → inspector populates)
 
----
+### Priority 3 — Settings Page
+- Build settings UI for theme, keyboard shortcuts, runtime source toggle
+- Persist settings (localStorage or filesystem)
 
-## Phase 6 — Agents + Task Queue
-Objective: monitor work happening across agents.
+### Priority 4 — Automations Backend
+- Wire rule execution engine to automation definitions
+- Add scheduling/trigger support
+- Connect to agent activity events
 
-### Tasks
-1. Build agents page with:
-   - status
-   - current task
-   - model used
-   - token/cost summary
-   - last activity
-2. Build task queue UI with:
-   - queued
-   - running
-   - blocked
-   - done
-3. Support future live updates with SSE/WebSocket-friendly state boundaries
-
-### Deliverables
-- agents board
-- queue board
-- execution status views
+### Priority 5 — Additional shadcn Components
+- Install dropdown-menu, tabs, badge, table, scroll-area as surfaces need them
+- Avoid installing speculatively — add when a feature requires them
 
 ---
 
-## Phase 7 — Logs + Memory Inspector
-Objective: make internals inspectable.
+## API Endpoints Reference
 
-### Logs
-- stream viewer
-- filter by agent/task/model
-- severity states
-- compact readable rows
-
-### Memory
-- inspect memory entries
-- inspect prompts/system context summaries
-- read-only first
-
-### Deliverables
-- logs page
-- memory page
-- inspector integration
-
----
-
-## Phase 8 — Cost + Usage Analytics
-Objective: operational visibility.
-
-### Tasks
-1. Add cost cards:
-   - per task
-   - per model
-   - daily total
-2. Add token usage summaries
-3. Add trend charts (simple first)
-4. Add cheap-vs-expensive routing comparisons
-
-### Deliverables
-- cost dashboard
-- usage breakdown panels
-
----
-
-## Phase 9 — QA + Hardening
-Objective: ensure the app is stable enough to iterate fast.
-
-### Tasks
-1. Add smoke tests
-2. Add UI regression checks later
-3. Verify keyboard nav
-4. Verify responsive behavior
-5. Verify shadcn components remain canonical
-6. Fix hydration/layout issues early
-
-### Deliverables
-- stable local QA baseline
-- reduced regression risk
-
----
-
-## Build Order (Strict Execution Sequence)
-1. Fix scaffold + shadcn init
-2. Install core shadcn components
-3. Add token/theme system
-4. Build primitive layer
-5. Build shell layout
-6. Build dashboard
-7. Build models/routing UI
-8. Build agents/tasks/logs
-9. Build costs/memory
-10. QA and polish
-
----
-
-## Immediate Execution Tasks
-These are the first implementation tickets to execute now:
-
-### Ticket 1 — shadcn foundation
-- initialize/fix shadcn
-- verify `button`, `card`, `input`, `dialog`, `command`
-- commit to `main`
-
-### Ticket 2 — theme system
-- add tokens
-- wire Tailwind theme
-- add ThemeProvider
-- commit to `main`
-
-### Ticket 3 — primitive layer
-- create shell-safe reusable primitives built on shadcn
-- commit to `main`
-
-### Ticket 4 — app shell
-- sidebar + top bar + inspector skeleton
-- commit to `main`
-
----
-
-## Success Criteria
-We are done with the first meaningful milestone when:
-- shadcn is properly installed and generating components
-- the app runs locally on 3003
-- the shell looks visually intentional
-- the dashboard feels like Mission Control, not boilerplate
-- future work can proceed without refactoring the foundation again
+| Endpoint | Methods | Purpose |
+|---|---|---|
+| `/api/agents` | GET, POST | List/create agents |
+| `/api/agents/activity` | GET | Agent activity history |
+| `/api/tasks` | GET, POST, PATCH | Task CRUD |
+| `/api/tasks/stream` | GET (SSE) | Real-time task updates |
+| `/api/models` | GET | Model routing config |
+| `/api/costs` | GET | MiniMax token/cost data |
+| `/api/memory` | GET | Memory file entries |
+| `/api/automations` | GET, POST | Automation rules |
+| `/api/runtime/dashboard` | GET | Dashboard state snapshot |
+| `/api/runtime/dashboard/stream` | GET (SSE) | Incremental dashboard updates |
+| `/api/openai/reporting` | GET | OpenAI admin cost data |
 
 ---
 
 ## Operating Notes
-- Cody should start with **Phase 0 / Ticket 1 immediately**
-- Cody should use **gpt-5.3-codex** for the build work
-- Jarvis remains orchestrator/product lead and pushes progress updates proactively
-- Sandra stays out of the loop until explicitly requested
+- Cody handles build work
+- Jarvis remains orchestrator/product lead
+- Runtime data comes from workspace-level files (`.runtime/`, agent configs) — not embedded in this repo
+- For production: replace in-memory task store with a DB adapter
 
 ---
 
-**Status:** Ready for execution
-**Next action:** Cody starts shadcn foundation work now
+**Status:** MVP complete — iterating on QA, inspector, and settings
