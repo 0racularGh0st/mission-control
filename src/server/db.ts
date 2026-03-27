@@ -73,6 +73,25 @@ function runMigrations(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_claude_started ON claude_sessions(started_at DESC);
     CREATE INDEX IF NOT EXISTS idx_claude_project ON claude_sessions(project);
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id               TEXT PRIMARY KEY,
+      title            TEXT NOT NULL,
+      lane             TEXT NOT NULL CHECK(lane IN ('now','next','review','blocked','done')),
+      status           TEXT NOT NULL CHECK(status IN ('queued','in progress','blocked','awaiting review','done')),
+      assignee         TEXT NOT NULL DEFAULT '',
+      priority         TEXT NOT NULL CHECK(priority IN ('P0','P1','P2','P3')),
+      summary          TEXT NOT NULL DEFAULT '',
+      detail           TEXT NOT NULL DEFAULT '',
+      blocking_reason  TEXT,
+      model            TEXT NOT NULL DEFAULT '',
+      eta_minutes      INTEGER,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tasks_lane ON tasks(lane);
+    CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at DESC);
   `);
 }
 

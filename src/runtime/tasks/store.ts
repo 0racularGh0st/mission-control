@@ -1,6 +1,7 @@
-// In-memory task store — lives in module scope (resets on server restart)
-// For production: replace with a DB adapter
+// SQLite-backed task store
+// Persists tasks across server restarts via the shared DB
 
+import { getDb } from "@/src/server/db";
 import { emitTaskEvent } from "./eventsBus";
 
 export type TaskLane = "now" | "next" | "review" | "blocked" | "done";
@@ -23,115 +24,98 @@ export interface Task {
   etaMinutes: number | null;
 }
 
-const tasks: Task[] = [
-  {
-    id: "T-584",
-    title: "Promote scheduler pulse to NOW lane",
-    lane: "now",
-    status: "in progress",
-    assignee: "Planner",
-    priority: "P1",
-    summary: "A fresh runtime pulse was detected and is being normalized into the active queue.",
-    detail: "Scheduler reconciles stale tasks, reorders lane depth, and emits a new runtime cursor once the queue state settles.",
-    model: "MiniMax-M2.7",
-    createdAt: new Date(Date.now() - 4 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 4 * 60000).toISOString(),
-    etaMinutes: 12,
-  },
-  {
-    id: "T-571",
-    title: "Unstick ops worker session",
-    lane: "blocked",
-    status: "blocked",
-    assignee: "Ops",
-    priority: "P0",
-    summary: "A worker has missed several heartbeats and needs manual confirmation.",
-    detail: "The task is waiting on a restarted local transport session before it can be safely retried.",
-    blockingReason: "No heartbeat for 11m on ops lane.",
-    model: "gpt-5.3-codex",
-    createdAt: new Date(Date.now() - 11 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 11 * 60000).toISOString(),
-    etaMinutes: null,
-  },
-  {
-    id: "T-612",
-    title: "Review ticket 4 merge",
-    lane: "review",
-    status: "awaiting review",
-    assignee: "Coder",
-    priority: "P2",
-    summary: "Merged work is queued for lint/build confirmation before it can be promoted.",
-    detail: "The review card is holding the line until the build remains green and the shell is validated on the Tasks page.",
-    model: "gpt-5.4-mini",
-    createdAt: new Date(Date.now() - 18 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 18 * 60000).toISOString(),
-    etaMinutes: 9,
-  },
-  {
-    id: "T-618",
-    title: "Refresh routing fallback policy",
-    lane: "next",
-    status: "queued",
-    assignee: "Research",
-    priority: "P3",
-    summary: "Model share is being rebalanced after a fallback spike.",
-    detail: "This task watches the router and prepares a safer default when high-latency models trend upward.",
-    model: "MiniMax-M2.7",
-    createdAt: new Date(Date.now() - 27 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 27 * 60000).toISOString(),
-    etaMinutes: 31,
-  },
-  {
-    id: "T-601",
-    title: "Finalize cost watch alert",
-    lane: "done",
-    status: "done",
-    assignee: "Planner",
-    priority: "P2",
-    summary: "Budget guardrails were confirmed and the alert was dismissed.",
-    detail: "Historical spend is now visible in the dashboard and the cost threshold is tracked via runtime metrics.",
-    model: "gpt-5.4",
-    createdAt: new Date(Date.now() - 42 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 42 * 60000).toISOString(),
-    etaMinutes: null,
-  },
-];
+interface TaskRow {
+  id: string;
+  title: string;
+  lane: TaskLane;
+  status: TaskStatus;
+  assignee: string;
+  priority: TaskPriority;
+  summary: string;
+  detail: string;
+  blocking_reason: string | null;
+  model: string;
+  eta_minutes: number | null;
+  created_at: string;
+  updated_at: string;
+}
 
-let nextId = 619;
+function rowToTask(row: TaskRow): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    lane: row.lane,
+    status: row.status,
+    assignee: row.assignee,
+    priority: row.priority,
+    summary: row.summary,
+    detail: row.detail,
+    blockingReason: row.blocking_reason ?? undefined,
+    model: row.model,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    etaMinutes: row.eta_minutes,
+  };
+}
+
+function nextId(): string {
+  const db = getDb();
+  const row = db.prepare("SELECT id FROM tasks ORDER BY CAST(SUBSTR(id, 3) AS INTEGER) DESC LIMIT 1").get() as { id: string } | undefined;
+  if (!row) return "T-1";
+  const num = parseInt(row.id.replace("T-", ""), 10);
+  return `T-${num + 1}`;
+}
 
 export function getTasks(): Task[] {
-  return [...tasks].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM tasks ORDER BY created_at ASC").all() as TaskRow[];
+  return rows.map(rowToTask);
 }
 
 export function getTask(id: string): Task | undefined {
-  return tasks.find((t) => t.id === id);
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | undefined;
+  return row ? rowToTask(row) : undefined;
 }
 
 export function createTask(data: Omit<Task, "id" | "createdAt" | "updatedAt">): Task {
-  const task: Task = {
-    ...data,
-    id: `T-${nextId++}`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  tasks.push(task);
+  const db = getDb();
+  const id = nextId();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO tasks (id, title, lane, status, assignee, priority, summary, detail, blocking_reason, model, eta_minutes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, data.title, data.lane, data.status, data.assignee, data.priority, data.summary, data.detail, data.blockingReason ?? null, data.model, data.etaMinutes ?? null, now, now);
+
+  const task = getTask(id)!;
   emitTaskEvent({ type: "task.created", taskId: task.id, task });
   return task;
 }
 
 export function updateTask(id: string, data: Partial<Omit<Task, "id" | "createdAt">>): Task | null {
-  const idx = tasks.findIndex((t) => t.id === id);
-  if (idx === -1) return null;
-  tasks[idx] = { ...tasks[idx], ...data, updatedAt: new Date().toISOString() };
-  const updated = tasks[idx];
+  const existing = getTask(id);
+  if (!existing) return null;
+
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  const merged = { ...existing, ...data, updatedAt: now };
+
+  db.prepare(`
+    UPDATE tasks SET title = ?, lane = ?, status = ?, assignee = ?, priority = ?, summary = ?, detail = ?, blocking_reason = ?, model = ?, eta_minutes = ?, updated_at = ?
+    WHERE id = ?
+  `).run(merged.title, merged.lane, merged.status, merged.assignee, merged.priority, merged.summary, merged.detail, merged.blockingReason ?? null, merged.model, merged.etaMinutes ?? null, now, id);
+
+  const updated = getTask(id)!;
   emitTaskEvent({ type: "task.updated", taskId: id, task: updated });
   return updated;
 }
 
 export function deleteTask(id: string): boolean {
-  const idx = tasks.findIndex((t) => t.id === id);
-  if (idx === -1) return false;
-  tasks.splice(idx, 1);
+  const db = getDb();
+  const result = db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+  if (result.changes === 0) return false;
   emitTaskEvent({ type: "task.deleted", taskId: id });
   return true;
 }

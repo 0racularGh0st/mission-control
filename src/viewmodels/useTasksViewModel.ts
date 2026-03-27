@@ -41,8 +41,7 @@ function taskToCard(task: Task): TaskCardViewModel {
 
 export function useTasksViewModel(snapshot: DashboardSnapshotDto, liveTasks?: Task[]) {
   return useMemo(() => {
-    // Prefer live tasks from API; fall back to snapshot-seeded mock
-    const tasks: Task[] = liveTasks && liveTasks.length > 0 ? liveTasks : buildSeedTasks();
+    const tasks: Task[] = liveTasks ?? [];
 
     const cards = tasks.map(taskToCard);
 
@@ -78,79 +77,3 @@ function buildLanesFromTasks(tasks: Task[]): TaskQueueLaneDto[] {
   }));
 }
 
-function buildSeedTasks(): Task[] {
-  // Mirrors the original taskSeed logic — used only when no live tasks available
-  return [
-    {
-      id: "T-584",
-      title: "Promote scheduler pulse to NOW lane",
-      lane: "now" as TaskLane,
-      status: "in progress",
-      assignee: "Planner",
-      priority: "P1",
-      summary: "A fresh runtime pulse was detected and is being normalized into the active queue.",
-      detail: "Scheduler reconciles stale tasks, reorders lane depth, and emits a new runtime cursor once the queue state settles.",
-      model: "MiniMax-M2.7",
-      createdAt: new Date(Date.now() - 4 * 60000).toISOString(),
-      updatedAt: new Date(Date.now() - 4 * 60000).toISOString(),
-      etaMinutes: 12,
-    },
-    {
-      id: "T-571",
-      title: "Unstick ops worker session",
-      lane: "blocked" as TaskLane,
-      status: "blocked",
-      assignee: "Ops",
-      priority: "P0",
-      summary: "A worker has missed several heartbeats and needs manual confirmation.",
-      detail: "The task is waiting on a restarted local transport session before it can be safely retried.",
-      blockingReason: "No heartbeat for 11m on ops lane.",
-      model: "gpt-5.3-codex",
-      createdAt: new Date(Date.now() - 11 * 60000).toISOString(),
-      updatedAt: new Date(Date.now() - 11 * 60000).toISOString(),
-      etaMinutes: null,
-    },
-    {
-      id: "T-612",
-      title: "Review ticket 4 merge",
-      lane: "review" as TaskLane,
-      status: "awaiting review",
-      assignee: "Coder",
-      priority: "P2",
-      summary: "Merged work is queued for lint/build confirmation before it can be promoted.",
-      detail: "The review card is holding the line until the build remains green and the shell is validated on the Tasks page.",
-      model: "gpt-5.4-mini",
-      createdAt: new Date(Date.now() - 18 * 60000).toISOString(),
-      updatedAt: new Date(Date.now() - 18 * 60000).toISOString(),
-      etaMinutes: 9,
-    },
-    {
-      id: "T-618",
-      title: "Refresh routing fallback policy",
-      lane: "next" as TaskLane,
-      status: "queued",
-      assignee: "Research",
-      priority: "P3",
-      summary: "Model share is being rebalanced after a fallback spike.",
-      detail: "This task watches the router and prepares a safer default when high-latency models trend upward.",
-      model: "MiniMax-M2.7",
-      createdAt: new Date(Date.now() - 27 * 60000).toISOString(),
-      updatedAt: new Date(Date.now() - 27 * 60000).toISOString(),
-      etaMinutes: 31,
-    },
-    {
-      id: "T-601",
-      title: "Finalize cost watch alert",
-      lane: "done" as TaskLane,
-      status: "done",
-      assignee: "Planner",
-      priority: "P2",
-      summary: "Budget guardrails were confirmed and the alert was dismissed.",
-      detail: "Historical spend is now visible in the dashboard and the cost threshold is tracked via runtime metrics.",
-      model: "gpt-5.4",
-      createdAt: new Date(Date.now() - 42 * 60000).toISOString(),
-      updatedAt: new Date(Date.now() - 42 * 60000).toISOString(),
-      etaMinutes: null,
-    },
-  ];
-}

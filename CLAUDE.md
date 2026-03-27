@@ -37,7 +37,8 @@ mission-control/
 │   │   └── *Client.tsx   # Page-level client wrappers
 │   ├── viewmodels/       # State/logic hooks per page
 │   ├── runtime/          # Runtime state management
-│   │   └── dashboard/    # Dashboard adapter pattern
+│   │   ├── dashboard/    # Dashboard adapter pattern
+│   │   └── tasks/        # Task store (SQLite-backed) + SSE event bus
 │   ├── server/           # Server-side data readers
 │   └── types/            # Shared TypeScript types
 ├── components/ui/        # shadcn primitives (button, card, input, dialog, command, etc.)
@@ -141,6 +142,13 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 ### Claude Sessions Page (`/claude`)
 - Displays Claude Code session data with pagination
 - 10 sessions per page, prev/next buttons + numbered page controls
+
+### Tasks Page (`/tasks`) — SQLite-backed
+- Kanban board with 5 lanes: now, next, review, blocked, done
+- CRUD via API routes (`/api/tasks`) with SSE streaming (`/api/tasks/stream`)
+- Tasks persisted in `tasks` table in SQLite (`src/server/db.ts`)
+- Store in `src/runtime/tasks/store.ts` — all operations go through DB, no in-memory state
+- No placeholder/seed data — page starts empty until tasks are created
 
 ## Quick Commands
 ```bash
