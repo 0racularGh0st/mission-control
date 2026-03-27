@@ -3,10 +3,10 @@
   color-scheme: dark;
 
   /* Core mission-control tokens */
-  --mc-bg: oklch(0.14 0.01 260);
-  --mc-surface: oklch(0.18 0.014 258);
-  --mc-surface-elevated: oklch(0.21 0.015 258);
-  --mc-border: oklch(0.35 0.015 260 / 0.45);
+  --mc-bg: oklch(0.14 0.01 235);
+  --mc-surface: oklch(0.18 0.014 230);
+  --mc-surface-elevated: oklch(0.21 0.015 225);
+  --mc-border: oklch(0.35 0.015 235 / 0.45);
   --mc-text: oklch(0.94 0.01 260);
   --mc-text-muted: oklch(0.72 0.015 260);
   --mc-accent: oklch(0.72 0.16 158);
@@ -63,8 +63,8 @@
 }
 
 .glass-panel {
-  background: color-mix(in oklch, var(--mc-surface-elevated) 75%, transparent);
-  border: 1px solid color-mix(in oklch, var(--mc-border) 85%, transparent);
+  background: var(--mc-surface-elevated);
+  border: 1px solid var(--mc-border);
   backdrop-filter: blur(10px);
 }
 

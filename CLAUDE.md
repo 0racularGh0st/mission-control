@@ -43,7 +43,7 @@ mission-control/
 │   └── types/            # Shared TypeScript types
 ├── components/ui/        # shadcn primitives (button, card, input, dialog, command, etc.)
 ├── lib/utils.ts          # cn() helper
-└── styles/               # Design tokens (tokens.css — MISSING, see Issues)
+└── styles/               # Design tokens (tokens.css)
 ```
 
 ## Important Conventions
@@ -58,7 +58,7 @@ mission-control/
 - Theme is **dark-only** — no light mode
 - CSS variables for all design tokens (in `styles/tokens.css`)
 - Use `bg-background`, `text-foreground`, `border-border` from theme
-- Glass panels: `glass-panel` class (defined in globals.css)
+- Glass panels: `glass-panel` class (defined in `styles/tokens.css`, uses blue-ish `--mc-surface-elevated` with `@supports` color-mix fallback)
 - Utility classes: `text-muted-foreground`, `bg-accent/35`, `bg-muted/60`
 
 ### Components
@@ -66,33 +66,14 @@ mission-control/
 - Wrap with `*Client.tsx` for client-side interactivity
 - ViewModels (`use*ViewModel.ts`) handle state/logic, components consume them
 
-## Design Tokens (MISSING — needs creation)
-The `styles/tokens.css` file is referenced in `globals.css` but **does not exist yet**. Must create:
-
-```css
-/* styles/tokens.css */
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #0a0a0c;
-  --card-foreground: #fafafa;
-  --popover: #0a0a0c;
-  --popover-foreground: #fafafa;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #27272a;
-  --muted-foreground: #71717a;
-  --accent: #3b82f6;
-  --accent-foreground: #ffffff;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #3b82f6;
-  --radius: 0.5rem;
-}
+## Design Tokens
+The `styles/tokens.css` file defines the mission-control color palette using oklch:
+- `--mc-bg`: Main background (hue 235)
+- `--mc-surface`: Card/panel surface (hue 230)
+- `--mc-surface-elevated`: Elevated surfaces / glass panels (hue 225)
+- `--mc-border`: Border color (hue 235)
+- `--mc-accent`: Primary accent (green, hue 158)
+- `--mc-accent-cyan`: Cyan accent (hue 220)
 ```
 
 ## Known Issues
@@ -103,12 +84,6 @@ The file has two `export default` statements:
 - `export default async function Home` (INVALID — follows layout)
 
 **Fix:** Move the Home function export to `app/page.tsx` and remove from layout.tsx.
-
-### 2. styles/tokens.css missing
-globals.css imports `./styles/tokens.css` but directory doesn't exist. Must create it.
-
-### 3. globals.css uses Tailwind v4 @theme inline syntax
-But package.json shows `@tailwindcss/postcss: ^4` and `tailwindcss: ^4`. This is correct for Tailwind v4 which uses the new CSS-first configuration.
 
 ## Coding Rules
 
@@ -149,6 +124,11 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - Tasks persisted in `tasks` table in SQLite (`src/server/db.ts`)
 - Store in `src/runtime/tasks/store.ts` — all operations go through DB, no in-memory state
 - No placeholder/seed data — page starts empty until tasks are created
+
+### Design Tokens Color Scheme
+- Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
+- Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
+- Accent colors: `--mc-accent` (green, hue 158), `--mc-accent-cyan` (cyan, hue 220)
 
 ## Quick Commands
 ```bash
