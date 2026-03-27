@@ -1,127 +1,167 @@
-import { readFileSync, appendFileSync, existsSync, statSync, writeFileSync } from "fs";
-import { join } from "path";
+/**
+ * Agent activity log — backed by SQLite with cursor-based pagination.
+ * Drop-in replacement for the old NDJSON file-based log.
+ */
+
+import { getDb } from "@/src/server/db";
 import type { AgentActivityEntry } from "@/src/types/agentActivity";
 
-const LOG_DIR = join(process.cwd(), ".runtime");
-const LOG_FILE = join(LOG_DIR, "agent-activity.log");
-const MAX_LOG_BYTES = 1024 * 1024; // 1MB
-
-// In-memory ring buffer (keeps last 200 entries in memory for fast reads)
-const RING_BUFFER_SIZE = 200;
-let ringBuffer: AgentActivityEntry[] = [];
-let initialized = false;
-
-function ensureLogDir() {
-  if (!existsSync(LOG_DIR)) {
-    writeFileSync(LOG_DIR, "", { flag: "w" }); // touch
-  }
-}
-
-function rotateLogIfNeeded() {
-  try {
-    const stat = statSync(LOG_FILE);
-    if (stat.size > MAX_LOG_BYTES) {
-      // Archive: rename current to .1
-      const archiveFile = `${LOG_FILE}.1`;
-      if (existsSync(archiveFile)) {
-        // Simple rotation: just overwrite .1 (no multi-archive)
-      }
-      const content = readFileSync(LOG_FILE, "utf-8");
-      writeFileSync(archiveFile, content, "utf-8");
-      writeFileSync(LOG_FILE, "", "utf-8");
-    }
-  } catch {
-    // File doesn't exist yet — nothing to rotate
-  }
-}
-
-function loadLogIntoRing() {
-  if (!existsSync(LOG_FILE)) return;
-  try {
-    const content = readFileSync(LOG_FILE, "utf-8");
-    const lines = content.split("\n").filter(Boolean);
-    // Load last RING_BUFFER_SIZE entries
-    const entries = lines.slice(-RING_BUFFER_SIZE);
-    ringBuffer = entries.map((line) => JSON.parse(line) as AgentActivityEntry);
-  } catch {
-    ringBuffer = [];
-  }
-}
-
-function init() {
-  if (initialized) return;
-  ensureLogDir();
-  loadLogIntoRing();
-  initialized = true;
+/**
+ * Log a new agent activity entry.
+ */
+export function logActivity(entry: AgentActivityEntry): void {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT OR REPLACE INTO agent_activity
+      (id, session_key, agent_type, model, started_at, completed_at,
+       duration_ms, tokens_in, tokens_out, task_desc, status, result, cost_usd)
+    VALUES
+      (@id, @sessionKey, @agentType, @model, @startedAt, @completedAt,
+       @durationMs, @tokensIn, @tokensOut, @taskDescription, @status, @resultSummary, @estimatedCostUsd)
+  `);
+  stmt.run(entry);
 }
 
 /**
- * Log a new agent activity entry. Appends to NDJSON file and updates ring buffer.
+ * Update a running activity entry by session key.
  */
-export function logActivity(entry: AgentActivityEntry): void {
-  init();
-  rotateLogIfNeeded();
-  const line = JSON.stringify(entry) + "\n";
-  appendFileSync(LOG_FILE, line, "utf-8");
-
-  // Update ring buffer (append, cap at RING_BUFFER_SIZE)
-  ringBuffer.push(entry);
-  if (ringBuffer.length > RING_BUFFER_SIZE) {
-    ringBuffer = ringBuffer.slice(-RING_BUFFER_SIZE);
-  }
-}
-
 export function updateActivityStatus(
   sessionKey: string,
   updates: Partial<Pick<AgentActivityEntry, "status" | "completedAt" | "durationMs" | "tokensIn" | "tokensOut" | "resultSummary" | "estimatedCostUsd">>,
 ): void {
-  init();
-  // Find the running entry for this session and replace it with a completed entry
-  const idx = ringBuffer.findIndex(
-    (a) => a.sessionKey === sessionKey && a.status === "running",
-  );
-  if (idx !== -1) {
-    ringBuffer[idx] = { ...ringBuffer[idx], ...updates };
-    // Append updated entry as new line to log (replace old entry by marking it)
-    appendFileSync(LOG_FILE, JSON.stringify(ringBuffer[idx]) + "\n", "utf-8");
-  }
+  const db = getDb();
+  const sets: string[] = [];
+  const params: Record<string, unknown> = { sessionKey };
+
+  if (updates.status !== undefined) { sets.push("status = @status"); params.status = updates.status; }
+  if (updates.completedAt !== undefined) { sets.push("completed_at = @completedAt"); params.completedAt = updates.completedAt; }
+  if (updates.durationMs !== undefined) { sets.push("duration_ms = @durationMs"); params.durationMs = updates.durationMs; }
+  if (updates.tokensIn !== undefined) { sets.push("tokens_in = @tokensIn"); params.tokensIn = updates.tokensIn; }
+  if (updates.tokensOut !== undefined) { sets.push("tokens_out = @tokensOut"); params.tokensOut = updates.tokensOut; }
+  if (updates.resultSummary !== undefined) { sets.push("result = @result"); params.result = updates.resultSummary; }
+  if (updates.estimatedCostUsd !== undefined) { sets.push("cost_usd = @costUsd"); params.costUsd = updates.estimatedCostUsd; }
+
+  if (sets.length === 0) return;
+
+  db.prepare(`
+    UPDATE agent_activity SET ${sets.join(", ")}
+    WHERE session_key = @sessionKey AND status = 'running'
+  `).run(params);
 }
 
 /**
- * Get recent activities from in-memory ring buffer.
- * Returns entries in reverse chronological order (most recent first).
- */
-export function getRecentActivities(limit = 50): AgentActivityEntry[] {
-  init();
-  return [...ringBuffer]
-    .reverse()
-    .slice(0, limit);
-}
-
-/**
- * Read last N entries directly from the NDJSON log file.
- * Used by API route to avoid needing the in-memory ring.
+ * Get recent activities (reverse chronological, most recent first).
+ * Used by the activity API route.
  */
 export function readActivitiesFromFile(limit = 50): AgentActivityEntry[] {
-  if (!existsSync(LOG_FILE)) return [];
-  try {
-    const content = readFileSync(LOG_FILE, "utf-8");
-    const lines = content.split("\n").filter(Boolean);
-    return lines
-      .slice(-limit)
-      .reverse()
-      .map((line) => JSON.parse(line) as AgentActivityEntry);
-  } catch {
-    return [];
-  }
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT id, session_key, agent_type, model, started_at, completed_at,
+           duration_ms, tokens_in, tokens_out, task_desc, status, result, cost_usd
+    FROM agent_activity
+    ORDER BY started_at DESC
+    LIMIT ?
+  `).all(limit) as ActivityRow[];
+
+  return rows.map(rowToEntry);
 }
 
 /**
- * Reset and reload the ring buffer from disk.
- * Used after backfilling to pick up updated entries.
+ * Cursor-based pagination for agent activity.
+ * Returns entries older than the cursor (started_at ISO string).
  */
+export function getActivitiesPaginated(opts: {
+  cursor?: string;
+  limit?: number;
+  agentType?: string;
+}): { entries: AgentActivityEntry[]; nextCursor: string | null } {
+  const db = getDb();
+  const limit = opts.limit ?? 25;
+  const conditions: string[] = [];
+  const params: Record<string, unknown> = { limit: limit + 1 };
+
+  if (opts.cursor) {
+    conditions.push("started_at < @cursor");
+    params.cursor = opts.cursor;
+  }
+  if (opts.agentType) {
+    conditions.push("agent_type = @agentType");
+    params.agentType = opts.agentType;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`
+    SELECT id, session_key, agent_type, model, started_at, completed_at,
+           duration_ms, tokens_in, tokens_out, task_desc, status, result, cost_usd
+    FROM agent_activity
+    ${where}
+    ORDER BY started_at DESC
+    LIMIT @limit
+  `).all(params) as ActivityRow[];
+
+  const hasMore = rows.length > limit;
+  const entries = rows.slice(0, limit).map(rowToEntry);
+  const nextCursor = hasMore && entries.length > 0
+    ? entries[entries.length - 1].startedAt
+    : null;
+
+  return { entries, nextCursor };
+}
+
+/**
+ * Get activity counts by agent type.
+ */
+export function getActivityStats(): { agentType: string; count: number; totalCost: number }[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT agent_type AS agentType, COUNT(*) AS count, COALESCE(SUM(cost_usd), 0) AS totalCost
+    FROM agent_activity
+    GROUP BY agent_type
+    ORDER BY count DESC
+  `).all() as { agentType: string; count: number; totalCost: number }[];
+}
+
+// Keep these as no-ops for backward compat with sessionMonitor imports
+export function getRecentActivities(limit = 50): AgentActivityEntry[] {
+  return readActivitiesFromFile(limit);
+}
+
 export function resetRingBuffer(): void {
-  initialized = false;
-  ringBuffer = [];
-  init();
+  // no-op — SQLite doesn't need ring buffer reset
+}
+
+// --- internal helpers ---
+
+interface ActivityRow {
+  id: string;
+  session_key: string;
+  agent_type: string;
+  model: string;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number;
+  tokens_in: number;
+  tokens_out: number;
+  task_desc: string;
+  status: string;
+  result: string;
+  cost_usd: number;
+}
+
+function rowToEntry(row: ActivityRow): AgentActivityEntry {
+  return {
+    id: row.id,
+    sessionKey: row.session_key,
+    agentType: row.agent_type as AgentActivityEntry["agentType"],
+    model: row.model,
+    startedAt: row.started_at,
+    completedAt: row.completed_at ?? row.started_at,
+    durationMs: row.duration_ms,
+    tokensIn: row.tokens_in,
+    tokensOut: row.tokens_out,
+    taskDescription: row.task_desc,
+    status: row.status as AgentActivityEntry["status"],
+    resultSummary: row.result,
+    estimatedCostUsd: row.cost_usd,
+  };
 }

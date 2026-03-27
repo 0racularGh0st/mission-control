@@ -18,6 +18,8 @@ const navItems = [
   { label: "Logs", href: "/logs" },
   { label: "Memory", href: "/memory" },
   { label: "Costs", href: "/costs" },
+  { label: "Claude", href: "/claude" },
+  { label: "Office", href: "/office" },
   { label: "Settings", href: "/settings" },
 ];
 

@@ -28,6 +28,8 @@ mission-control/
 │   ├── costs/page.tsx
 │   ├── settings/page.tsx
 │   ├── automations/page.tsx
+│   ├── claude/page.tsx    # Claude sessions viewer (paginated, 10/page)
+│   ├── office/            # Office page (placeholder)
 │   └── api/              # API routes
 ├── src/
 │   ├── components/       # Client components
@@ -129,6 +131,16 @@ The BUILD_PLAN.md defines 9 phases:
 10. QA + Hardening
 
 Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
+
+## Recent Additions
+
+### Navigation
+- **Office** nav item added to AppShell sidebar (between Claude and Settings)
+- **"Go to Office"** command added to CommandPalette with `Building2` icon
+
+### Claude Sessions Page (`/claude`)
+- Displays Claude Code session data with pagination
+- 10 sessions per page, prev/next buttons + numbered page controls
 
 ## Quick Commands
 ```bash

@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Bot, DollarSign, Home, ListTodo, Logs, MemoryStick, Settings, Sparkles, Workflow } from "lucide-react";
+import { Bot, Building2, DollarSign, Home, ListTodo, Logs, MemoryStick, Settings, Sparkles, Workflow } from "lucide-react";
 
 type CommandEntry = {
   id: string;
@@ -85,6 +85,13 @@ export function CommandPalette() {
       label: "Go to Costs",
       icon: <DollarSign className="size-4" />,
       action: () => { router.push("/costs"); setOpen(false); },
+      group: "Navigation",
+    },
+    {
+      id: "nav-office",
+      label: "Go to Office",
+      icon: <Building2 className="size-4" />,
+      action: () => { router.push("/office"); setOpen(false); },
       group: "Navigation",
     },
     {
