@@ -101,8 +101,8 @@ class MockDashboardAdapter implements DashboardRuntimeAdapter {
 
 function resolveRuntimeSource(): RuntimeSource {
   const value = process.env.MISSION_CONTROL_RUNTIME_SOURCE;
-  if (value === "local" || value === "real") return "local";
-  return "mock";
+  if (value === "mock") return "mock";
+  return "local";
 }
 
 export function getDashboardAdapter(): DashboardRuntimeAdapter {
