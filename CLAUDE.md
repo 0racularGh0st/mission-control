@@ -132,6 +132,21 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - DB migration v2 in `db.ts` normalises legacy free-text assignees to `"Jarvis"` then recreates the table with the CHECK constraint
 - Edit form (`EditTaskDialog`) pre-fills current values; submits PATCH `action:"update"` to `/api/tasks`
 
+### Timeline / Activity Feed (`/timeline`) — T-001
+- Unified chronological feed of all activity (tasks, agents, sessions, costs)
+- **DB:** `timeline_events` table (v3 migration in `src/server/db.ts`) — append-only, `INSERT OR IGNORE`
+- **Write path:** `recordEvent()` in `src/server/timeline.ts` — called from task store, agent activity log, and session scanner
+- **Event bus:** `src/runtime/timeline/eventsBus.ts` — in-memory pub/sub, same pattern as task events bus
+- **API:** `GET /api/timeline` (cursor pagination, source filter) + `GET /api/timeline/stream` (SSE)
+- **Types:** `src/types/timeline.ts` — `TimelineEvent`, `TimelineSource`, `TimelineEventType`
+- **Page:** `app/timeline/page.tsx` → `TimelineClient` → `useTimelineViewModel`
+- **Components:** `TimelineEvent.tsx`, `TimelineFilterBar.tsx`, `TimelineClient.tsx`, `TimelineWidget.tsx`
+- **Dashboard widget:** `TimelineWidget` shows 5 most recent events on dashboard
+- **Nav:** "Timeline" in AppShell sidebar + "Go to Timeline" (G T) in CommandPalette
+- **Keyboard:** Arrow keys / j/k step through events, `f` focuses filter bar
+- **Cost spike detection:** Emits `cost.spike` events when agent or session cost > $0.10
+- **Event sources wired:** task store (create/update/delete/move), agent activity log, session scanner
+
 ### Design Tokens Color Scheme
 - Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
@@ -143,7 +158,12 @@ Individual feature build plans live in the repo root as `buildplan-T-XXX.md` fil
 
 | File | Task | Status |
 |---|---|---|
-| `buildplan-T-001.md` | Timeline / Activity Feed | Planning |
+| `buildplan-T-001.md` | Timeline / Activity Feed | Implemented |
+| `buildplan-T-002.md` | Approvals Inbox | Planning |
+| `buildplan-T-003.md` | Retry Center | Planning |
+| `buildplan-T-004.md` | Prompt / Run Inspector | Planning |
+| `buildplan-T-005.md` | Daily Briefing Page | Planning |
+| `buildplan-T-006.md` | Agent Memory Graph | Planning |
 
 ## Quick Commands
 ```bash

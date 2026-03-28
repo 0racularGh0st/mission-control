@@ -6,6 +6,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from "fs";
 import { join, basename } from "path";
 import { getDb } from "@/src/server/db";
+import { recordEvent } from "@/src/server/timeline";
 
 const CLAUDE_DIR = join(process.env.HOME ?? "/Users/nigel", ".claude");
 const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
@@ -269,6 +270,22 @@ export function scanAndIngestSessions(): { ingested: number; skipped: number; to
 
   if (toInsert.length > 0) {
     insertMany(toInsert);
+
+    // Record timeline events for ingested sessions
+    for (const s of toInsert) {
+      const eventType = s.endedAt ? "session.ended" : "session.started";
+      const costLabel = s.costUsd > 0 ? ` · $${s.costUsd.toFixed(2)}` : "";
+      recordEvent(eventType, "sessions", s.sessionId, s.model,
+        `Session ${eventType === "session.ended" ? "ended" : "started"} (${s.project})${costLabel}`,
+        JSON.stringify({ project: s.project, model: s.model, cost: s.costUsd, messages: s.messageCount }));
+
+      // Cost spike detection for sessions
+      if (s.costUsd > 0.10) {
+        recordEvent("cost.spike", "costs", s.sessionId, s.model,
+          `Cost spike: $${s.costUsd.toFixed(2)} on session (${s.project})`,
+          JSON.stringify({ cost: s.costUsd, threshold: 0.10, project: s.project }));
+      }
+    }
   }
 
   return { ingested, skipped, total };

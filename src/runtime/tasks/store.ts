@@ -3,6 +3,7 @@
 
 import { getDb } from "@/src/server/db";
 import { emitTaskEvent } from "./eventsBus";
+import { recordEvent } from "@/src/server/timeline";
 export { TASK_LANES, TASK_ASSIGNEES } from "./constants";
 export type { Task, TaskLane, TaskAssignee, TaskPriority, TaskStatus } from "./constants";
 
@@ -74,10 +75,11 @@ export function createTask(data: Omit<Task, "id" | "createdAt" | "updatedAt">): 
 
   const task = getTask(id)!;
   emitTaskEvent({ type: "task.created", taskId: task.id, task });
+  recordEvent("task.created", "tasks", task.id, task.assignee, `Task '${task.title}' created in ${task.lane}`);
   return task;
 }
 
-export function updateTask(id: string, data: Partial<Omit<Task, "id" | "createdAt">>): Task | null {
+export function updateTask(id: string, data: Partial<Omit<Task, "id" | "createdAt">>, { skipTimeline }: { skipTimeline?: boolean } = {}): Task | null {
   const existing = getTask(id);
   if (!existing) return null;
 
@@ -93,18 +95,25 @@ export function updateTask(id: string, data: Partial<Omit<Task, "id" | "createdA
 
   const updated = getTask(id)!;
   emitTaskEvent({ type: "task.updated", taskId: id, task: updated });
+  if (!skipTimeline) {
+    recordEvent("task.updated", "tasks", id, updated.assignee, `Task '${updated.title}' updated`);
+  }
   return updated;
 }
 
 export function deleteTask(id: string): boolean {
   const db = getDb();
+  const existing = getTask(id);
   const result = db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
   if (result.changes === 0) return false;
   emitTaskEvent({ type: "task.deleted", taskId: id });
+  recordEvent("task.deleted", "tasks", id, existing?.assignee ?? "system", `Task '${existing?.title ?? id}' deleted`);
   return true;
 }
 
 export function moveTask(id: string, lane: TaskLane): Task | null {
+  const existing = getTask(id);
+  const fromLane = existing?.lane ?? "unknown";
   const statusMap: Record<TaskLane, TaskStatus> = {
     now: "in progress",
     next: "queued",
@@ -112,9 +121,14 @@ export function moveTask(id: string, lane: TaskLane): Task | null {
     blocked: "blocked",
     done: "done",
   };
-  const updated = updateTask(id, { lane, status: statusMap[lane] });
+  const updated = updateTask(id, { lane, status: statusMap[lane] }, { skipTimeline: true });
   if (updated) {
     emitTaskEvent({ type: "task.moved", taskId: id, task: updated, lane });
+    recordEvent(
+      "task.moved", "tasks", id, updated.assignee,
+      `Task '${updated.title}' moved → ${lane}`,
+      JSON.stringify({ from: fromLane, to: lane }),
+    );
   }
   return updated;
 }

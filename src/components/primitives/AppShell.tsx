@@ -17,6 +17,7 @@ const navItems = [
   { label: "Automations", href: "/automations" },
   { label: "Logs", href: "/logs" },
   { label: "Memory", href: "/memory" },
+  { label: "Timeline", href: "/timeline" },
   { label: "Costs", href: "/costs" },
   { label: "Claude", href: "/claude" },
   { label: "Office", href: "/office" },

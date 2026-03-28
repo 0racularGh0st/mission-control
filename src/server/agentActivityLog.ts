@@ -4,6 +4,7 @@
  */
 
 import { getDb } from "@/src/server/db";
+import { recordEvent } from "@/src/server/timeline";
 import type { AgentActivityEntry } from "@/src/types/agentActivity";
 
 /**
@@ -20,6 +21,15 @@ export function logActivity(entry: AgentActivityEntry): void {
        @durationMs, @tokensIn, @tokensOut, @taskDescription, @status, @resultSummary, @estimatedCostUsd)
   `);
   stmt.run(entry);
+
+  const eventType = entry.status === "running" ? "agent.started"
+    : entry.status === "failed" ? "agent.failed"
+    : "agent.completed";
+  const actor = entry.agentType === "jarvis" ? "Jarvis"
+    : entry.agentType === "cody" ? "Cody"
+    : entry.agentType;
+  recordEvent(eventType, "agents", entry.sessionKey, actor, `${actor} — ${entry.taskDescription}`,
+    JSON.stringify({ model: entry.model, cost: entry.estimatedCostUsd }));
 }
 
 /**
@@ -47,6 +57,19 @@ export function updateActivityStatus(
     UPDATE agent_activity SET ${sets.join(", ")}
     WHERE session_key = @sessionKey AND status = 'running'
   `).run(params);
+
+  if (updates.status && updates.status !== "running") {
+    const eventType = updates.status === "failed" ? "agent.failed" : "agent.completed";
+    recordEvent(eventType, "agents", sessionKey, "system", `Agent session ${sessionKey.slice(0, 8)} ${updates.status}`,
+      JSON.stringify({ cost: updates.estimatedCostUsd }));
+
+    // Cost spike detection: emit cost.spike if session cost > $0.10
+    if (updates.estimatedCostUsd !== undefined && updates.estimatedCostUsd > 0.10) {
+      recordEvent("cost.spike", "costs", sessionKey, "system",
+        `Cost spike: $${updates.estimatedCostUsd.toFixed(2)} on agent session`,
+        JSON.stringify({ cost: updates.estimatedCostUsd, threshold: 0.10 }));
+    }
+  }
 }
 
 /**

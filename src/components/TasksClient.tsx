@@ -11,7 +11,7 @@ import { Panel, SectionHeader } from "@/src/components/primitives";
 import type { DashboardRuntimeStateDto } from "@/src/runtime/dashboard/types";
 import { useDashboardRuntime } from "@/src/runtime/dashboard/useDashboardRuntime";
 import { useTasksViewModel } from "@/src/viewmodels/useTasksViewModel";
-import type { Task, TaskAssignee, TaskLane } from "@/src/runtime/tasks/constants";
+import type { Task, TaskAssignee, TaskLane, TaskPriority } from "@/src/runtime/tasks/constants";
 import { TASK_ASSIGNEES, TASK_LANES } from "@/src/runtime/tasks/constants";
 import { cn } from "@/lib/utils";
 
@@ -149,7 +149,7 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Priority</label>
-              <Input value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-1" />
+              <Input value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="mt-1" />
             </div>
           </div>
           <div>
@@ -255,7 +255,7 @@ function EditTaskDialog({ task, open, onClose, onUpdated }: { task: Task; open: 
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Priority</label>
-              <Input value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-1" />
+              <Input value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="mt-1" />
             </div>
           </div>
           <div>

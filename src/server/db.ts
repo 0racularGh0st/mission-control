@@ -151,6 +151,29 @@ function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at DESC);
     `);
     db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (2)").run();
+    currentVersion = 2;
+  }
+
+  // v3 — timeline_events table for unified activity feed
+  if (currentVersion < 3) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS timeline_events (
+        id          TEXT PRIMARY KEY,
+        event_type  TEXT NOT NULL,
+        source      TEXT NOT NULL CHECK(source IN ('tasks','agents','sessions','costs')),
+        ref_id      TEXT NOT NULL DEFAULT '',
+        actor       TEXT NOT NULL DEFAULT '',
+        title       TEXT NOT NULL,
+        detail      TEXT NOT NULL DEFAULT '',
+        occurred_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_timeline_occurred ON timeline_events(occurred_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_timeline_source   ON timeline_events(source);
+      CREATE INDEX IF NOT EXISTS idx_timeline_ref      ON timeline_events(ref_id);
+    `);
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (3)").run();
   }
 }
 

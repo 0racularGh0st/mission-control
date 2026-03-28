@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Bot, Building2, DollarSign, Home, ListTodo, Logs, MemoryStick, Settings, Sparkles, Workflow } from "lucide-react";
+import { Activity, Bot, Building2, DollarSign, Home, ListTodo, Logs, MemoryStick, Settings, Sparkles, Workflow } from "lucide-react";
 
 type CommandEntry = {
   id: string;
@@ -78,6 +78,14 @@ export function CommandPalette() {
       label: "Go to Memory",
       icon: <MemoryStick className="size-4" />,
       action: () => { router.push("/memory"); setOpen(false); },
+      group: "Navigation",
+    },
+    {
+      id: "nav-timeline",
+      label: "Go to Timeline",
+      shortcut: "G T",
+      icon: <Activity className="size-4" />,
+      action: () => { router.push("/timeline"); setOpen(false); },
       group: "Navigation",
     },
     {
