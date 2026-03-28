@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { CommandPalette } from "@/src/components/CommandPalette";
+import { ApprovalsBadge } from "@/src/components/ApprovalsBadge";
+import { RetriesBadge } from "@/src/components/RetriesBadge";
 
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/src/components/primitives/CommandBar";
@@ -14,6 +16,8 @@ const navItems = [
   { label: "Models", href: "/models" },
   { label: "Agents", href: "/agents" },
   { label: "Tasks", href: "/tasks" },
+  { label: "Approvals", href: "/approvals", badge: "approvals" },
+  { label: "Retries", href: "/retries", badge: "retries" },
   { label: "Automations", href: "/automations" },
   { label: "Logs", href: "/logs" },
   { label: "Memory", href: "/memory" },
@@ -45,13 +49,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "block rounded-lg px-2 py-2 text-sm transition-colors",
+                    "flex items-center rounded-lg px-2 py-2 text-sm transition-colors",
                     active
                       ? "bg-accent/35 text-foreground"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   )}
                 >
                   {item.label}
+                  {"badge" in item && item.badge === "approvals" && <ApprovalsBadge />}
+                  {"badge" in item && item.badge === "retries" && <RetriesBadge />}
                 </Link>
               );
             })}

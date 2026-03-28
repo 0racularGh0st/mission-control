@@ -174,6 +174,74 @@ function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_timeline_ref      ON timeline_events(ref_id);
     `);
     db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (3)").run();
+    currentVersion = 3;
+  }
+
+  // v4 — approvals table for human-in-the-loop control plane
+  if (currentVersion < 4) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS approvals (
+        id          TEXT PRIMARY KEY,
+        agent       TEXT NOT NULL,
+        action      TEXT NOT NULL,
+        reason      TEXT NOT NULL DEFAULT '',
+        risk_level  TEXT NOT NULL DEFAULT 'medium'
+                    CHECK(risk_level IN ('low','medium','high','critical')),
+        context     TEXT NOT NULL DEFAULT '',
+        status      TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending','approved','rejected','expired')),
+        comment     TEXT NOT NULL DEFAULT '',
+        ref_id      TEXT NOT NULL DEFAULT '',
+        expires_at  TEXT NOT NULL,
+        resolved_at TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_approvals_status  ON approvals(status);
+      CREATE INDEX IF NOT EXISTS idx_approvals_created ON approvals(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_approvals_agent   ON approvals(agent);
+    `);
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (4)").run();
+    currentVersion = 4;
+  }
+
+  // v5 — retries + retry_attempts tables for Retry Center
+  if (currentVersion < 5) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS retries (
+        id              TEXT PRIMARY KEY,
+        source          TEXT NOT NULL CHECK(source IN ('agents','tasks','sessions')),
+        ref_id          TEXT NOT NULL,
+        error_summary   TEXT NOT NULL,
+        error_detail    TEXT NOT NULL DEFAULT '',
+        original_params TEXT NOT NULL DEFAULT '{}',
+        status          TEXT NOT NULL DEFAULT 'failed'
+                        CHECK(status IN ('failed','retrying','resolved','dismissed')),
+        attempt_count   INTEGER NOT NULL DEFAULT 0,
+        max_attempts    INTEGER NOT NULL DEFAULT 3,
+        last_attempt_at TEXT,
+        resolved_at     TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_retries_status  ON retries(status);
+      CREATE INDEX IF NOT EXISTS idx_retries_source  ON retries(source);
+      CREATE INDEX IF NOT EXISTS idx_retries_created ON retries(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_retries_ref     ON retries(ref_id);
+
+      CREATE TABLE IF NOT EXISTS retry_attempts (
+        id         TEXT PRIMARY KEY,
+        retry_id   TEXT NOT NULL REFERENCES retries(id),
+        attempt    INTEGER NOT NULL,
+        outcome    TEXT NOT NULL CHECK(outcome IN ('success','failed')),
+        error      TEXT NOT NULL DEFAULT '',
+        started_at TEXT NOT NULL DEFAULT (datetime('now')),
+        ended_at   TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_retry_attempts_retry ON retry_attempts(retry_id);
+    `);
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (5)").run();
   }
 }
 

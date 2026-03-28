@@ -147,6 +147,41 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - **Cost spike detection:** Emits `cost.spike` events when agent or session cost > $0.10
 - **Event sources wired:** task store (create/update/delete/move), agent activity log, session scanner
 
+### Approvals Inbox (`/approvals`) — T-002
+- Human-in-the-loop control plane: agents submit approval requests, operators approve/reject
+- **DB:** `approvals` table (v4 migration in `src/server/db.ts`) — status CHECK (pending/approved/rejected/expired), risk_level CHECK (low/medium/high/critical)
+- **Server:** `src/server/approvals.ts` — `createApproval()`, `resolveApproval()`, `getApprovals()`, `expireStale()`, `getPendingCount()`
+- **Deduplication:** Same agent + action + ref_id within 5-minute window returns existing approval
+- **Lazy expiry:** `expireStale()` runs on every read; marks pending items past `expires_at` as expired
+- **Optimistic lock:** PATCH only resolves if `status = 'pending'`; returns 409 if already resolved
+- **Event bus:** `src/runtime/approvals/eventsBus.ts` — in-memory pub/sub, same pattern as timeline/tasks
+- **API:** `POST /api/approvals` (create), `PATCH /api/approvals` (approve/reject), `GET /api/approvals` (list with status/agent/cursor filters), `GET /api/approvals/stream` (SSE)
+- **Types:** `src/types/approvals.ts` — `Approval`, `ApprovalStatus`, `ApprovalRiskLevel`
+- **Page:** `app/approvals/page.tsx` → `ApprovalsClient` → `useApprovalsViewModel`
+- **Components:** `ApprovalCard.tsx`, `ApprovalFilterBar.tsx`, `ApprovalDetailPanel.tsx`, `ApprovalsClient.tsx`, `ApprovalsBadge.tsx`, `ApprovalsWidget.tsx`
+- **Dashboard widget:** `ApprovalsWidget` shows pending count + oldest item
+- **Nav:** "Approvals" in AppShell sidebar (with live badge) + "Go to Approvals" (G A) in CommandPalette
+- **Keyboard:** Arrow keys / j/k navigate, `a` approve, `r` reject, `f` focus filter, Enter expand details, Escape close
+- **Timeline integration:** All approval state changes emit timeline events via `recordEvent()`
+
+### Retry Center (`/retries`) — T-003
+- Surfaces all failed agent runs, task executions, and session crashes in one place
+- **DB:** `retries` table + `retry_attempts` table (v5 migration in `src/server/db.ts`)
+- **Statuses:** `failed` | `retrying` | `resolved` | `dismissed` — CHECK constraints
+- **Sources:** `agents` | `tasks` | `sessions`
+- **Server:** `src/server/retries.ts` — `createRetryEntry()`, `attemptRetry()`, `dismissRetry()`, `getRetries()`, `getFailedCount()`, `getAttempts()`
+- **Max attempts:** Default 3 per retry; auto-dismiss when exceeded
+- **Event bus:** `src/runtime/retries/eventsBus.ts` — in-memory pub/sub, same pattern as timeline/approvals
+- **API:** `GET /api/retries` (status/source/cursor pagination), `POST /api/retries` (create), `POST /api/retries/retry` (retry), `PATCH /api/retries` (dismiss), `GET /api/retries/stream` (SSE)
+- **Types:** `src/types/retries.ts` — `RetryEntry`, `RetryAttempt`, `RetrySource`, `RetryStatus`
+- **Page:** `app/retries/page.tsx` → `RetriesClient` → `useRetriesViewModel`
+- **Components:** `RetryCard.tsx`, `RetryFilterBar.tsx`, `RetryDetailPanel.tsx`, `RetriesClient.tsx`, `RetriesBadge.tsx`, `RetriesWidget.tsx`
+- **Dashboard widget:** `RetriesWidget` shows failed count + most recent failure
+- **Nav:** "Retries" in AppShell sidebar (with live red badge) + "Go to Retries" (G R) in CommandPalette
+- **Keyboard:** Arrow keys / j/k navigate, `R` retry, `d` dismiss, `f` focus filter, Enter expand details, Escape close
+- **Timeline integration:** All retry state changes emit timeline events via `recordEvent()`
+- **Optimistic UI:** Cards show immediate status change, roll back on API failure
+
 ### Design Tokens Color Scheme
 - Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
@@ -159,8 +194,8 @@ Individual feature build plans live in the repo root as `buildplan-T-XXX.md` fil
 | File | Task | Status |
 |---|---|---|
 | `buildplan-T-001.md` | Timeline / Activity Feed | Implemented |
-| `buildplan-T-002.md` | Approvals Inbox | Planning |
-| `buildplan-T-003.md` | Retry Center | Planning |
+| `buildplan-T-002.md` | Approvals Inbox | Implemented |
+| `buildplan-T-003.md` | Retry Center | Implemented |
 | `buildplan-T-004.md` | Prompt / Run Inspector | Planning |
 | `buildplan-T-005.md` | Daily Briefing Page | Planning |
 | `buildplan-T-006.md` | Agent Memory Graph | Planning |

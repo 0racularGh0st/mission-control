@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Activity, Bot, Building2, DollarSign, Home, ListTodo, Logs, MemoryStick, Settings, Sparkles, Workflow } from "lucide-react";
+import { Activity, Bot, Building2, DollarSign, Home, ListTodo, Logs, MemoryStick, RotateCcw, Settings, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 
 type CommandEntry = {
   id: string;
@@ -57,6 +57,22 @@ export function CommandPalette() {
       label: "Go to Tasks",
       icon: <ListTodo className="size-4" />,
       action: () => { router.push("/tasks"); setOpen(false); },
+      group: "Navigation",
+    },
+    {
+      id: "nav-approvals",
+      label: "Go to Approvals",
+      shortcut: "G A",
+      icon: <ShieldCheck className="size-4" />,
+      action: () => { router.push("/approvals"); setOpen(false); },
+      group: "Navigation",
+    },
+    {
+      id: "nav-retries",
+      label: "Go to Retries",
+      shortcut: "G R",
+      icon: <RotateCcw className="size-4" />,
+      action: () => { router.push("/retries"); setOpen(false); },
       group: "Navigation",
     },
     {
