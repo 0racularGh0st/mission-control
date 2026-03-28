@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { InspectorMessage, InspectorSource } from "@/src/types/inspector";
@@ -17,26 +19,39 @@ export function MessageDetail({ message, source, inspectId, onClose }: MessageDe
   const [fullContent, setFullContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Fetch full content if message was truncated
-  useEffect(() => {
-    if (!message.fullContent) {
-      setFullContent(null);
-      return;
-    }
+  const displayContent = useMemo(() => fullContent ?? message.content, [fullContent, message.content]);
 
+  useEffect(() => {
+    if (!message.fullContent) return;
+
+    let cancelled = false;
+
+    // If this is a new message, clear previous fetched content.
+    setFullContent(null);
     setLoading(true);
+
     fetch(`/api/inspect/${source}/${inspectId}/message/${message.index}`)
       .then((res) => res.json())
-      .then((data) => setFullContent(data.content ?? message.content))
-      .catch(() => setFullContent(message.fullContent ?? message.content))
-      .finally(() => setLoading(false));
-  }, [message.index, message.fullContent, message.content, source, inspectId]);
+      .then((data) => {
+        if (cancelled) return;
+        setFullContent(data.content ?? message.content);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFullContent(message.fullContent ?? message.content);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
 
-  const displayContent = fullContent ?? message.content;
+    return () => {
+      cancelled = true;
+    };
+  }, [message.index, message.fullContent, message.content, source, inspectId]);
 
   return (
     <div className="space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-foreground capitalize">{message.role}</span>
@@ -49,9 +64,7 @@ export function MessageDetail({ message, source, inspectId, onClose }: MessageDe
             </span>
           )}
           {message.costUsd > 0 && (
-            <span className="text-[11px] text-muted-foreground">
-              ${message.costUsd.toFixed(4)}
-            </span>
+            <span className="text-[11px] text-muted-foreground">${message.costUsd.toFixed(4)}</span>
           )}
         </div>
         <button
@@ -62,7 +75,6 @@ export function MessageDetail({ message, source, inspectId, onClose }: MessageDe
         </button>
       </div>
 
-      {/* Content */}
       <div>
         <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Content</div>
         {loading ? (
@@ -70,49 +82,26 @@ export function MessageDetail({ message, source, inspectId, onClose }: MessageDe
             Loading full content...
           </div>
         ) : (
-          <pre className={cn(
-            "max-h-64 overflow-auto rounded-md border border-border/60 bg-background/35 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-words",
-          )}>
+          <pre
+            className={cn(
+              "max-h-64 overflow-auto rounded-md border border-border/60 bg-background/35 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-words"
+            )}
+          >
             {displayContent || "(empty)"}
           </pre>
         )}
       </div>
 
-      {/* Tool calls */}
-      {message.toolCalls && message.toolCalls.length > 0 && (
+      {message.toolCalls?.length ? (
         <div>
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Tool calls ({message.toolCalls.length})
-          </div>
-          <div className="space-y-1.5">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Tool calls</div>
+          <div className="space-y-2">
             {message.toolCalls.map((tc, i) => (
               <ToolCallView key={i} toolCall={tc} />
             ))}
           </div>
         </div>
-      )}
-
-      {/* Tool result */}
-      {message.toolResult && (
-        <div>
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Tool Result</div>
-          <pre className="max-h-32 overflow-auto rounded-md border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
-            {message.toolResult}
-          </pre>
-        </div>
-      )}
-
-      {/* Timing */}
-      {message.durationMs > 0 && (
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span>Duration:</span>
-          <span className="font-medium text-foreground">
-            {message.durationMs >= 1000
-              ? `${(message.durationMs / 1000).toFixed(1)}s`
-              : `${message.durationMs}ms`}
-          </span>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import type { InspectorMessage, CostBreakdown } from "@/src/types/inspector";
+import type { CostBreakdown, InspectorMessage } from "@/src/types/inspector";
 
 interface CostAttributionProps {
   messages: InspectorMessage[];
@@ -11,7 +10,6 @@ interface CostAttributionProps {
 
 export function CostAttribution({ messages, costBreakdown, totalCostUsd }: CostAttributionProps) {
   const costedMessages = messages.filter((m) => m.costUsd > 0);
-  let runningTotal = 0;
 
   return (
     <div className="space-y-3">
@@ -55,27 +53,26 @@ export function CostAttribution({ messages, costBreakdown, totalCostUsd }: CostA
             Per-message cost
           </div>
           <div className="space-y-0.5">
-            {costedMessages.map((msg) => {
-              runningTotal += msg.costUsd;
-              return (
-                <div
-                  key={msg.index}
-                  className="flex items-center justify-between rounded border border-border/40 bg-background/25 px-2 py-1 text-[10px]"
-                >
-                  <span className="text-muted-foreground">
-                    #{msg.index} {msg.role}
-                  </span>
-                  <div className="flex items-center gap-3">
+            {(() => {
+              let runningTotal = 0;
+              return costedMessages.map((msg) => {
+                runningTotal += msg.costUsd;
+                return (
+                  <div
+                    key={msg.index}
+                    className="flex items-center justify-between rounded border border-border/40 bg-background/25 px-2 py-1 text-[10px]"
+                  >
                     <span className="text-muted-foreground">
-                      ${msg.costUsd.toFixed(4)}
+                      #{msg.index} {msg.role}
                     </span>
-                    <span className="font-mono text-foreground/70">
-                      Σ ${runningTotal.toFixed(4)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">${msg.costUsd.toFixed(4)}</span>
+                      <span className="font-mono text-foreground/70">Σ ${runningTotal.toFixed(4)}</span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
           <p className="mt-1 text-[10px] italic text-muted-foreground/60">
             Estimated — may differ from session total
