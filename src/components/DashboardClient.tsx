@@ -8,10 +8,12 @@ import { MetricCard, Panel, SectionHeader } from "@/src/components/primitives";
 import { TimelineWidget } from "@/src/components/TimelineWidget";
 import { ApprovalsWidget } from "@/src/components/ApprovalsWidget";
 import { RetriesWidget } from "@/src/components/RetriesWidget";
+import { MemoryWidget } from "@/src/components/MemoryWidget";
 import type { DashboardRuntimeStateDto } from "@/src/runtime/dashboard/types";
 import type { TimelineEvent } from "@/src/types/timeline";
 import type { Approval } from "@/src/types/approvals";
 import type { RetryEntry } from "@/src/types/retries";
+import type { MemoryStats } from "@/src/types/memory";
 import { useDashboardRuntime } from "@/src/runtime/dashboard/useDashboardRuntime";
 import { type BadgeTone, useDashboardViewModel } from "@/src/viewmodels/useDashboardViewModel";
 
@@ -28,7 +30,7 @@ function Badge({ children, tone = "default" }: { children: React.ReactNode; tone
   return <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${toneClass}`}>{children}</span>;
 }
 
-export function DashboardClient({ initialRuntime, recentTimelineEvents = [], approvalsPendingCount = 0, approvalsOldest = null, retriesFailedCount = 0, retriesMostRecent = null }: { initialRuntime: DashboardRuntimeStateDto; recentTimelineEvents?: TimelineEvent[]; approvalsPendingCount?: number; approvalsOldest?: Approval | null; retriesFailedCount?: number; retriesMostRecent?: RetryEntry | null }) {
+export function DashboardClient({ initialRuntime, recentTimelineEvents = [], approvalsPendingCount = 0, approvalsOldest = null, retriesFailedCount = 0, retriesMostRecent = null, memoryStats }: { initialRuntime: DashboardRuntimeStateDto; recentTimelineEvents?: TimelineEvent[]; approvalsPendingCount?: number; approvalsOldest?: Approval | null; retriesFailedCount?: number; retriesMostRecent?: RetryEntry | null; memoryStats?: MemoryStats }) {
   const { snapshot, runtimeMeta } = useDashboardRuntime({
     initialRuntime,
     cursorStorageKey: CURSOR_STORAGE_KEY,
@@ -139,6 +141,7 @@ export function DashboardClient({ initialRuntime, recentTimelineEvents = [], app
         <TimelineWidget events={recentTimelineEvents} />
         <ApprovalsWidget pendingCount={approvalsPendingCount} oldest={approvalsOldest} />
         <RetriesWidget failedCount={retriesFailedCount} mostRecent={retriesMostRecent} />
+        {memoryStats && <MemoryWidget stats={memoryStats} />}
 
         <Panel title="Recent logs" description="Latest execution and orchestration events from runtime.">
           {hasLogs ? (

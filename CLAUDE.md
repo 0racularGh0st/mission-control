@@ -203,6 +203,20 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - **Tool calls:** Collapsible view showing tool name, arguments (formatted JSON), and result preview
 - **Transcript handling:** Graceful fallback when transcript file missing — shows metadata only from DB
 
+### Agent Memory Graph (`/memory`) — T-006
+- Visualizes agent memory entries (CLAUDE.md files, project memory) as a force-directed graph + searchable list
+- **DB:** `memory_entries` + `memory_edges` tables (v6 migration in `src/server/db.ts`)
+- **Scanner:** `src/server/memoryScanner.ts` — discovers `.md` files with frontmatter from `~/.claude/projects/*/memory/`, parses metadata, extracts topics (WikiLinks, headings), computes edges (shared_topic, reference, same_agent, temporal), content hashing for change detection
+- **Types:** `src/types/memory.ts` — `MemoryEntry`, `MemoryEdge`, `MemoryType`, `MemoryScanResult`, `MemoryStats`
+- **API:** `GET /api/memory` (list/graph format, agent/type/search filters), `GET /api/memory/:id`, `POST /api/memory/scan`, `DELETE /api/memory/:id`, `GET /api/memory/stats`, `GET /api/memory/stream` (SSE)
+- **Event bus:** `src/runtime/memory/eventsBus.ts` — in-memory pub/sub for scan/delete events
+- **Page:** `app/memory/page.tsx` → `MemoryClient` → `useMemoryViewModel`
+- **Components:** `src/components/memory/` — `MemoryGraph` (Canvas force-directed), `MemoryList`, `MemoryDetail`, `MemoryFilterBar`, `MemoryScanButton`
+- **Dashboard widget:** `MemoryWidget` shows total count, type breakdown, edge count
+- **Graph view:** Canvas-based force simulation, nodes color-coded by type (sky=user, amber=feedback, emerald=project, violet=reference), sized by connection count, edges styled by type
+- **Keyboard:** `/` to search, `Tab` to switch views, `j/k` navigate list, `Esc` close detail
+- **Timeline integration:** Scan and delete events emit timeline events via `recordEvent()`
+
 ### Design Tokens Color Scheme
 - Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
@@ -219,7 +233,7 @@ Individual feature build plans live in the repo root as `buildplan-T-XXX.md` fil
 | `buildplan-T-003.md` | Retry Center | Implemented |
 | `buildplan-T-004.md` | Prompt / Run Inspector | Implemented |
 | `buildplan-T-005.md` | Daily Briefing Page | Planning |
-| `buildplan-T-006.md` | Agent Memory Graph | Planning |
+| `buildplan-T-006.md` | Agent Memory Graph | Implemented |
 
 ## Quick Commands
 ```bash

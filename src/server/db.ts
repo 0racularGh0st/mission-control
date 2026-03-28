@@ -243,6 +243,45 @@ function runMigrations(db: Database.Database): void {
     `);
     db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (5)").run();
   }
+
+  // v6 — memory_entries + memory_edges for Agent Memory Graph
+  if (currentVersion < 6) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS memory_entries (
+        id            TEXT PRIMARY KEY,
+        source_path   TEXT NOT NULL UNIQUE,
+        agent         TEXT NOT NULL DEFAULT 'system',
+        name          TEXT NOT NULL,
+        description   TEXT NOT NULL DEFAULT '',
+        mem_type      TEXT NOT NULL DEFAULT 'project'
+                      CHECK(mem_type IN ('user','feedback','project','reference')),
+        content       TEXT NOT NULL,
+        topics        TEXT NOT NULL DEFAULT '[]',
+        file_hash     TEXT NOT NULL,
+        discovered_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_memory_agent   ON memory_entries(agent);
+      CREATE INDEX IF NOT EXISTS idx_memory_type    ON memory_entries(mem_type);
+      CREATE INDEX IF NOT EXISTS idx_memory_updated ON memory_entries(updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS memory_edges (
+        id          TEXT PRIMARY KEY,
+        source_id   TEXT NOT NULL REFERENCES memory_entries(id) ON DELETE CASCADE,
+        target_id   TEXT NOT NULL REFERENCES memory_entries(id) ON DELETE CASCADE,
+        edge_type   TEXT NOT NULL
+                    CHECK(edge_type IN ('shared_topic','reference','same_agent','temporal')),
+        weight      REAL NOT NULL DEFAULT 1.0,
+        label       TEXT NOT NULL DEFAULT '',
+        UNIQUE(source_id, target_id, edge_type)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_edges_source ON memory_edges(source_id);
+      CREATE INDEX IF NOT EXISTS idx_edges_target ON memory_edges(target_id);
+    `);
+    db.prepare("INSERT OR IGNORE INTO schema_migrations (version) VALUES (6)").run();
+  }
 }
 
 export function closeDb(): void {

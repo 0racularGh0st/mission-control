@@ -20,7 +20,9 @@ export type TimelineEventType =
   | "retry.created"
   | "retry.resolved"
   | "retry.failed"
-  | "retry.dismissed";
+  | "retry.dismissed"
+  | "memory.scanned"
+  | "memory.deleted";
 
 export const TIMELINE_SOURCES: TimelineSource[] = ["tasks", "agents", "sessions", "costs"];
 
