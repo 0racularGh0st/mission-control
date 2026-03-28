@@ -3,33 +3,17 @@
 
 import { getDb } from "@/src/server/db";
 import { emitTaskEvent } from "./eventsBus";
+export { TASK_LANES, TASK_ASSIGNEES } from "./constants";
+export type { Task, TaskLane, TaskAssignee, TaskPriority, TaskStatus } from "./constants";
 
-export type TaskLane = "now" | "next" | "review" | "blocked" | "done";
-export type TaskPriority = "P0" | "P1" | "P2" | "P3";
-export type TaskStatus = "queued" | "in progress" | "blocked" | "awaiting review" | "done";
-
-export interface Task {
-  id: string;
-  title: string;
-  lane: TaskLane;
-  status: TaskStatus;
-  assignee: string;
-  priority: TaskPriority;
-  summary: string;
-  detail: string;
-  blockingReason?: string;
-  model: string;
-  createdAt: string; // ISO
-  updatedAt: string; // ISO
-  etaMinutes: number | null;
-}
+import type { Task, TaskLane, TaskAssignee, TaskPriority, TaskStatus } from "./constants";
 
 interface TaskRow {
   id: string;
   title: string;
   lane: TaskLane;
   status: TaskStatus;
-  assignee: string;
+  assignee: TaskAssignee;
   priority: TaskPriority;
   summary: string;
   detail: string;

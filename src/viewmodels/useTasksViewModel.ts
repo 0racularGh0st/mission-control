@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { DashboardSnapshotDto, TaskQueueLaneDto } from "@/src/runtime/dashboard/types";
-import type { Task, TaskLane } from "@/src/runtime/tasks/store";
+import type { Task, TaskLane } from "@/src/runtime/tasks/constants";
 
 export interface TaskCardViewModel extends Task {
   laneLabel: string;

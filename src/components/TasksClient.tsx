@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, Flag, Plus, Trash2, UserRound } from "lucide-react";
+import { Clock3, Flag, Pencil, Plus, Trash2, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +11,8 @@ import { Panel, SectionHeader } from "@/src/components/primitives";
 import type { DashboardRuntimeStateDto } from "@/src/runtime/dashboard/types";
 import { useDashboardRuntime } from "@/src/runtime/dashboard/useDashboardRuntime";
 import { useTasksViewModel } from "@/src/viewmodels/useTasksViewModel";
-import type { Task, TaskLane } from "@/src/runtime/tasks/store";
+import type { Task, TaskAssignee, TaskLane } from "@/src/runtime/tasks/constants";
+import { TASK_ASSIGNEES, TASK_LANES } from "@/src/runtime/tasks/constants";
 import { cn } from "@/lib/utils";
 
 const CURSOR_STORAGE_KEY = "mission-control.tasks.cursor";
@@ -38,7 +39,7 @@ function formatRelativeTime(iso: string) {
   return `${hrs}h ago`;
 }
 
-function TaskDetailActions({ task, onClose, onRefresh }: { task: Task; onClose: () => void; onRefresh: () => void }) {
+function TaskDetailActions({ task, onClose, onRefresh, onEdit }: { task: Task; onClose: () => void; onRefresh: () => void; onEdit: () => void }) {
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -76,6 +77,9 @@ function TaskDetailActions({ task, onClose, onRefresh }: { task: Task; onClose: 
           Move to {lane}
         </Button>
       ))}
+      <Button variant="outline" size="sm" onClick={onEdit}>
+        <Pencil className="mr-1 size-3" /> Edit
+      </Button>
       <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting} className="ml-auto">
         <Trash2 className="mr-1 size-3" /> Delete
       </Button>
@@ -85,7 +89,7 @@ function TaskDetailActions({ task, onClose, onRefresh }: { task: Task; onClose: 
 
 function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [title, setTitle] = useState("");
-  const [assignee, setAssignee] = useState("Jarvis");
+  const [assignee, setAssignee] = useState<TaskAssignee>("Jarvis");
   const [priority, setPriority] = useState("P2");
   const [lane, setLane] = useState<TaskLane>("next");
   const [summary, setSummary] = useState("");
@@ -135,7 +139,13 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Assignee</label>
-              <Input value={assignee} onChange={(e) => setAssignee(e.target.value)} className="mt-1" />
+              <select
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value as TaskAssignee)}
+                className="mt-1 h-9 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              >
+                {TASK_ASSIGNEES.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Priority</label>
@@ -144,7 +154,13 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Lane</label>
-            <Input value={lane} onChange={(e) => setLane(e.target.value as TaskLane)} className="mt-1" />
+            <select
+              value={lane}
+              onChange={(e) => setLane(e.target.value as TaskLane)}
+              className="mt-1 h-9 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+            >
+              {TASK_LANES.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Summary</label>
@@ -160,12 +176,119 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
   );
 }
 
+const SELECT_CLASS = "mt-1 h-9 w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+
+function EditTaskDialog({ task, open, onClose, onUpdated }: { task: Task; open: boolean; onClose: () => void; onUpdated: () => void }) {
+  const [title, setTitle] = useState(task.title);
+  const [assignee, setAssignee] = useState<TaskAssignee>(task.assignee);
+  const [priority, setPriority] = useState(task.priority);
+  const [lane, setLane] = useState<TaskLane>(task.lane);
+  const [summary, setSummary] = useState(task.summary);
+  const [saving, setSaving] = useState(false);
+
+  // Reset form when a different task is opened for editing
+  useEffect(() => {
+    setTitle(task.title);
+    setAssignee(task.assignee);
+    setPriority(task.priority);
+    setLane(task.lane);
+    setSummary(task.summary);
+  }, [task.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const laneStatusMap: Record<TaskLane, string> = {
+    now: "in progress",
+    next: "queued",
+    review: "awaiting review",
+    blocked: "blocked",
+    done: "done",
+  };
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: task.id,
+          action: "update",
+          title: title.trim(),
+          assignee,
+          priority,
+          lane,
+          status: laneStatusMap[lane],
+          summary,
+          detail: summary,
+        }),
+      });
+      onUpdated();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="border-border/70 bg-popover sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Task</DialogTitle>
+          <DialogDescription>{task.id}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="text-xs text-muted-foreground">Title</label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Assignee</label>
+              <select
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value as TaskAssignee)}
+                className={SELECT_CLASS}
+              >
+                {TASK_ASSIGNEES.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Priority</label>
+              <Input value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Lane</label>
+            <select
+              value={lane}
+              onChange={(e) => setLane(e.target.value as TaskLane)}
+              className={SELECT_CLASS}
+            >
+              {TASK_LANES.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Summary</label>
+            <Input value={summary} onChange={(e) => setSummary(e.target.value)} className="mt-1" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving || !title.trim()}>{saving ? "Saving..." : "Save"}</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRuntimeStateDto }) {
   const { snapshot, runtimeMeta } = useDashboardRuntime({ initialRuntime, cursorStorageKey: CURSOR_STORAGE_KEY });
   const { cards, lanes, summary } = useTasksViewModel(snapshot);
   const [liveTasks, setLiveTasks] = useState<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function fetchTasks() {
@@ -312,7 +435,7 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
         </section>
       )}
 
-      <Dialog open={Boolean(selectedTask)} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
+      <Dialog open={Boolean(selectedTask)} onOpenChange={(open) => { if (!open) { setSelectedTaskId(null); setShowEdit(false); } }}>
         <DialogContent className="max-w-3xl overflow-hidden border-border/70 bg-popover p-0 sm:max-w-3xl">
           {selectedTask && (
             <div className="grid max-h-[80vh] gap-0 md:grid-cols-[1.15fr_0.85fr]">
@@ -340,7 +463,7 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
                   </div>
                 )}
 
-                <TaskDetailActions task={selectedTask} onClose={() => setSelectedTaskId(null)} onRefresh={fetchTasks} />
+                <TaskDetailActions task={selectedTask} onClose={() => setSelectedTaskId(null)} onRefresh={fetchTasks} onEdit={() => setShowEdit(true)} />
               </div>
 
               <aside className="border-t border-border/60 bg-background/30 p-6 md:border-t-0 md:border-l">
@@ -368,6 +491,15 @@ export function TasksClient({ initialRuntime }: { initialRuntime: DashboardRunti
       </Dialog>
 
       <CreateTaskDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={fetchTasks} />
+
+      {selectedTask && (
+        <EditTaskDialog
+          task={selectedTask}
+          open={showEdit}
+          onClose={() => setShowEdit(false)}
+          onUpdated={fetchTasks}
+        />
+      )}
     </div>
   );
 }

@@ -125,10 +125,25 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - Store in `src/runtime/tasks/store.ts` — all operations go through DB, no in-memory state
 - No placeholder/seed data — page starts empty until tasks are created
 
+#### Task Field Constraints (enforced at TS, API, and DB layers)
+- `assignee`: union type `TaskAssignee = "Jarvis" | "Cody"` — `<select>` dropdown in create AND edit forms, API rejects other values, DB CHECK constraint (v2 migration)
+- `lane`: union type `TaskLane = "now" | "next" | "review" | "blocked" | "done"` — `<select>` dropdown in create AND edit forms, API rejects other values, DB CHECK constraint
+- Canonical arrays `TASK_ASSIGNEES` and `TASK_LANES` exported from `store.ts` — single source of truth used by UI dropdowns, API validators, and DB constraints
+- DB migration v2 in `db.ts` normalises legacy free-text assignees to `"Jarvis"` then recreates the table with the CHECK constraint
+- Edit form (`EditTaskDialog`) pre-fills current values; submits PATCH `action:"update"` to `/api/tasks`
+
 ### Design Tokens Color Scheme
 - Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
 - Accent colors: `--mc-accent` (green, hue 158), `--mc-accent-cyan` (cyan, hue 220)
+
+## Feature Build Plans
+
+Individual feature build plans live in the repo root as `buildplan-T-XXX.md` files. These are implementation-ready specs covering goal, data sources, schema, API routes, UI components, phased milestones, edge cases, and acceptance criteria.
+
+| File | Task | Status |
+|---|---|---|
+| `buildplan-T-001.md` | Timeline / Activity Feed | Planning |
 
 ## Quick Commands
 ```bash
