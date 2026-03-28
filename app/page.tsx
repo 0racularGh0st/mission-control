@@ -4,6 +4,8 @@ import { getRecentEvents } from "@/src/server/timeline";
 import { getApprovals } from "@/src/server/approvals";
 import { getRetries } from "@/src/server/retries";
 import { getMemoryStats } from "@/src/server/memoryScanner";
+import { getTasks } from "@/src/runtime/tasks/store";
+import type { TaskLaneCounts } from "@/src/components/TasksWidget";
 
 export default async function Home() {
   const runtime = await getDashboardRuntimeState();
@@ -11,6 +13,15 @@ export default async function Home() {
   const approvalsData = getApprovals({ status: "pending", limit: 1 });
   const retriesData = getRetries({ status: "failed", limit: 1 });
   const memoryStats = getMemoryStats();
+
+  // Compute task lane counts from the store
+  const allTasks = getTasks();
+  const taskLaneCounts: TaskLaneCounts = { now: 0, next: 0, review: 0, blocked: 0, done: 0 };
+  for (const task of allTasks) {
+    if (task.lane in taskLaneCounts) {
+      taskLaneCounts[task.lane]++;
+    }
+  }
 
   return (
     <DashboardClient
@@ -21,6 +32,7 @@ export default async function Home() {
       retriesFailedCount={retriesData.failedCount}
       retriesMostRecent={retriesData.retries[0] ?? null}
       memoryStats={memoryStats}
+      taskLaneCounts={taskLaneCounts}
     />
   );
 }

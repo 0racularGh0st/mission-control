@@ -222,6 +222,15 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
 - Accent colors: `--mc-accent` (green, hue 158), `--mc-accent-cyan` (cyan, hue 220)
 
+### Dashboard Homepage (Root `/`)
+The dashboard at `app/page.tsx` → `DashboardClient` composes all subsystem widgets into a single homepage:
+- **Layout sections:** Hero header → Key metrics (4 MetricCards with `glass-panel accent-glow`) → Subsystems (3-col grid) → Operations (2-col grid) → Situation (3-col alerts/logs/actions)
+- **Subsystem widgets:** `TimelineWidget`, `ApprovalsWidget`, `RetriesWidget`, `TasksWidget`, `MemoryWidget`, Token & cost summary — all in a responsive 3-col grid
+- **TasksWidget** (`src/components/TasksWidget.tsx`): Shows lane counts (now/next/review/blocked/done) with color-coded grid; links to `/tasks`
+- **Operator quick actions** are now `<Link>` components routing to `/agents`, `/tasks`, `/models`, `/costs`, `/approvals`
+- **Data flow:** `app/page.tsx` (server) fetches from runtime adapter, timeline, approvals, retries, memory, and task store; passes all to `DashboardClient` (client) which uses `useDashboardRuntime` (SSE/polling) for live updates
+- **Glass styling:** MetricCards use `glass-panel accent-glow`; operational panels use default `Panel` card styling
+
 ## Feature Build Plans
 
 Individual feature build plans live in the repo root as `buildplan-T-XXX.md` files. These are implementation-ready specs covering goal, data sources, schema, API routes, UI components, phased milestones, edge cases, and acceptance criteria.
