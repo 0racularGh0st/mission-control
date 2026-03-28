@@ -1,0 +1,118 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { InspectorMessage, InspectorSource } from "@/src/types/inspector";
+import { ToolCallView } from "./ToolCallView";
+
+interface MessageDetailProps {
+  message: InspectorMessage;
+  source: InspectorSource;
+  inspectId: string;
+  onClose: () => void;
+}
+
+export function MessageDetail({ message, source, inspectId, onClose }: MessageDetailProps) {
+  const [fullContent, setFullContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch full content if message was truncated
+  useEffect(() => {
+    if (!message.fullContent) {
+      setFullContent(null);
+      return;
+    }
+
+    setLoading(true);
+    fetch(`/api/inspect/${source}/${inspectId}/message/${message.index}`)
+      .then((res) => res.json())
+      .then((data) => setFullContent(data.content ?? message.content))
+      .catch(() => setFullContent(message.fullContent ?? message.content))
+      .finally(() => setLoading(false));
+  }, [message.index, message.fullContent, message.content, source, inspectId]);
+
+  const displayContent = fullContent ?? message.content;
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-foreground capitalize">{message.role}</span>
+          <span className="text-[11px] text-muted-foreground">#{message.index}</span>
+          {message.tokensIn + message.tokensOut > 0 && (
+            <span className="text-[11px] text-muted-foreground">
+              {message.tokensIn > 0 && `${message.tokensIn} in`}
+              {message.tokensIn > 0 && message.tokensOut > 0 && " / "}
+              {message.tokensOut > 0 && `${message.tokensOut} out`}
+            </span>
+          )}
+          {message.costUsd > 0 && (
+            <span className="text-[11px] text-muted-foreground">
+              ${message.costUsd.toFixed(4)}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div>
+        <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Content</div>
+        {loading ? (
+          <div className="rounded-md border border-border/60 bg-background/35 p-2 text-[11px] text-muted-foreground">
+            Loading full content...
+          </div>
+        ) : (
+          <pre className={cn(
+            "max-h-64 overflow-auto rounded-md border border-border/60 bg-background/35 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-words",
+          )}>
+            {displayContent || "(empty)"}
+          </pre>
+        )}
+      </div>
+
+      {/* Tool calls */}
+      {message.toolCalls && message.toolCalls.length > 0 && (
+        <div>
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Tool calls ({message.toolCalls.length})
+          </div>
+          <div className="space-y-1.5">
+            {message.toolCalls.map((tc, i) => (
+              <ToolCallView key={i} toolCall={tc} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tool result */}
+      {message.toolResult && (
+        <div>
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Tool Result</div>
+          <pre className="max-h-32 overflow-auto rounded-md border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
+            {message.toolResult}
+          </pre>
+        </div>
+      )}
+
+      {/* Timing */}
+      {message.durationMs > 0 && (
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span>Duration:</span>
+          <span className="font-medium text-foreground">
+            {message.durationMs >= 1000
+              ? `${(message.durationMs / 1000).toFixed(1)}s`
+              : `${message.durationMs}ms`}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

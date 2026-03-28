@@ -182,6 +182,27 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - **Timeline integration:** All retry state changes emit timeline events via `recordEvent()`
 - **Optimistic UI:** Cards show immediate status change, roll back on API failure
 
+### Prompt / Run Inspector (`/inspect`) — T-004
+- X-ray visibility into any agent run or Claude session: full prompt chain, model responses, tool calls, token usage, timing, and cost breakdown
+- **No new DB tables:** Reads from existing `agent_activity` and `claude_sessions` tables + on-disk JSONL transcripts
+- **Server:** `src/server/inspector.ts` — transcript JSONL parser, per-message cost attribution, timing waterfall computation
+- **Types:** `src/types/inspector.ts` — `InspectorData`, `InspectorMessage`, `InspectorMeta`, `ToolCallInfo`, `ToolSummary`, `CostBreakdown`
+- **API:** `GET /api/inspect/:source/:id` (full inspection data) + `GET /api/inspect/:source/:id/message/:index` (full message content)
+- **Sources:** `agents` | `sessions` — passed as URL param
+- **Right sidebar:** `InspectorPanel` wired into AppShell right sidebar via `InspectorProvider` context (`src/runtime/inspector/context.tsx`)
+- **Full page:** `app/inspect/[source]/[id]/page.tsx` → `InspectorFullView` with wider layout, timing waterfall, cost attribution
+- **Sub-components:** `src/components/inspector/` — `MessageList`, `MessageDetail`, `TokenBreakdown`, `ToolCallView`, `TimingWaterfall`, `CostAttribution`
+- **ViewModel:** `src/viewmodels/useInspectorViewModel.ts` — loads data, manages message selection, abort-on-reselect
+- **Context:** `InspectorProvider` wraps entire app (in layout.tsx), exposes `useInspector()` hook
+- **Keyboard:** `i` toggles inspector panel, `Escape` closes, arrow keys / j/k navigate messages in inspector
+- **CommandPalette:** "Inspect Run" (G I) command
+- **Deep links:** `/inspect/sessions/abc123` and `/inspect/agents/xyz789` directly openable
+- **Message pagination:** Full page view paginates messages 50 per page for large transcripts
+- **Token breakdown:** Visual bar chart showing input/output/cache split with color-coded legend
+- **Cost attribution:** Per-message cost with running total and estimated vs actual disclaimer
+- **Tool calls:** Collapsible view showing tool name, arguments (formatted JSON), and result preview
+- **Transcript handling:** Graceful fallback when transcript file missing — shows metadata only from DB
+
 ### Design Tokens Color Scheme
 - Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
@@ -196,7 +217,7 @@ Individual feature build plans live in the repo root as `buildplan-T-XXX.md` fil
 | `buildplan-T-001.md` | Timeline / Activity Feed | Implemented |
 | `buildplan-T-002.md` | Approvals Inbox | Implemented |
 | `buildplan-T-003.md` | Retry Center | Implemented |
-| `buildplan-T-004.md` | Prompt / Run Inspector | Planning |
+| `buildplan-T-004.md` | Prompt / Run Inspector | Implemented |
 | `buildplan-T-005.md` | Daily Briefing Page | Planning |
 | `buildplan-T-006.md` | Agent Memory Graph | Planning |
 

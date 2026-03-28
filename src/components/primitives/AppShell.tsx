@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { CommandPalette } from "@/src/components/CommandPalette";
 import { ApprovalsBadge } from "@/src/components/ApprovalsBadge";
 import { RetriesBadge } from "@/src/components/RetriesBadge";
+import { InspectorPanel } from "@/src/components/InspectorPanel";
+import { useInspector } from "@/src/runtime/inspector/context";
 
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/src/components/primitives/CommandBar";
@@ -30,6 +32,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const inspector = useInspector();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -96,12 +99,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Panel
             className="h-full"
             title="Inspector"
-            description="Context panel for selected entities and quick metadata."
+            description={inspector.isOpen && inspector.data
+              ? `${inspector.data.meta.source} · ${inspector.data.meta.model}`
+              : "Context panel for selected entities and quick metadata."}
           >
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>No item selected.</p>
-              <p>Use the command bar or sidebar to navigate context.</p>
-            </div>
+            <InspectorPanel
+              data={inspector.data}
+              loading={inspector.loading}
+              error={inspector.error}
+              selectedMessageIndex={inspector.selectedMessageIndex}
+              onSelectMessage={inspector.selectMessage}
+              onClose={inspector.close}
+            />
           </Panel>
         </aside>
       </div>

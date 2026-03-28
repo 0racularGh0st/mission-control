@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/src/components/ThemeProvider";
 import { AppShell } from "@/src/components/primitives";
+import { InspectorProvider } from "@/src/runtime/inspector/context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,7 +35,9 @@ export default function RootLayout({
     >
       <body className="min-h-full font-sans text-foreground">
         <ThemeProvider>
-          <AppShell>{children}</AppShell>
+          <InspectorProvider>
+            <AppShell>{children}</AppShell>
+          </InspectorProvider>
         </ThemeProvider>
       </body>
     </html>
