@@ -2,7 +2,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Bot, Clock3, Command, Cpu, DollarSign, ListTodo, Router } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Bot, Clock3, Command, Cpu, ListTodo, Router } from "lucide-react";
 
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import { MetricCard, Panel, SectionHeader } from "@/src/components/primitives";
@@ -201,12 +201,6 @@ export function DashboardClient({
                     <Cpu className="h-3.5 w-3.5" />Inspect model fallback
                   </span>
                   <span className="text-muted-foreground">M</span>
-                </Link>
-                <Link href="/costs" className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 transition-colors hover:border-border hover:bg-background/50">
-                  <span className="flex items-center gap-2">
-                    <DollarSign className="h-3.5 w-3.5" />Open cost analyzer
-                  </span>
-                  <span className="text-muted-foreground">C</span>
                 </Link>
                 <Link href="/tasks" className="flex items-center justify-between rounded-lg border border-border/60 bg-background/35 px-3 py-2 transition-colors hover:border-border hover:bg-background/50">
                   <span className="flex items-center gap-2">

@@ -11,6 +11,7 @@ import { useInspector } from "@/src/runtime/inspector/context";
 
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/src/components/primitives/CommandBar";
+import { JarvisLogo } from "@/src/components/primitives/JarvisLogo";
 import { Panel } from "@/src/components/primitives/Panel";
 
 const navItems = [
@@ -24,7 +25,7 @@ const navItems = [
   { label: "Logs", href: "/logs" },
   { label: "Memory", href: "/memory" },
   { label: "Timeline", href: "/timeline" },
-  { label: "Costs", href: "/costs" },
+  { label: "Calendar", href: "/calendar" },
   { label: "Claude", href: "/claude" },
   { label: "Office", href: "/office" },
   { label: "Settings", href: "/settings" },
@@ -39,8 +40,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <CommandPalette />
       <div className="mx-auto grid min-h-screen w-full max-w-[1600px] grid-cols-1 gap-3 p-3 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
         <aside className="glass-panel sticky top-0 hidden rounded-xl p-3 xl:block h-fit">
-          <div className="mb-3 px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Mission Control
+          <div className="mb-3 flex items-center gap-2 px-2 py-1">
+            <JarvisLogo size={24} />
+            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Mission Control
+            </span>
           </div>
           <nav className="space-y-1">
             {navItems.map((item) => {

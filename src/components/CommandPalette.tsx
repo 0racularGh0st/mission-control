@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Activity, Bot, Building2, DollarSign, Home, ListTodo, Logs, MemoryStick, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { Activity, Bot, Building2, CalendarDays, Home, ListTodo, Logs, MemoryStick, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 
 type CommandEntry = {
   id: string;
@@ -105,10 +105,11 @@ export function CommandPalette() {
       group: "Navigation",
     },
     {
-      id: "nav-costs",
-      label: "Go to Costs",
-      icon: <DollarSign className="size-4" />,
-      action: () => { router.push("/costs"); setOpen(false); },
+      id: "nav-calendar",
+      label: "Go to Calendar",
+      shortcut: "G C",
+      icon: <CalendarDays className="size-4" />,
+      action: () => { router.push("/calendar"); setOpen(false); },
       group: "Navigation",
     },
     {

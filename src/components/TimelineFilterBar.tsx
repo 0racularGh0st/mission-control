@@ -7,7 +7,6 @@ const SOURCE_LABELS: Record<TimelineSource, string> = {
   tasks: "Tasks",
   agents: "Agents",
   sessions: "Sessions",
-  costs: "Costs",
 };
 
 interface TimelineFilterBarProps {

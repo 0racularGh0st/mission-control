@@ -13,7 +13,6 @@ test.describe("Route availability", () => {
     { path: "/models", label: "Models" },
     { path: "/automations", label: "Automations" },
     { path: "/memory", label: "Memory" },
-    { path: "/costs", label: "Costs" },
     { path: "/settings", label: "Settings" },
   ];
 

@@ -1,7 +1,7 @@
 # Mission Control — Claude Code Context
 
 ## Project Overview
-AI Mission Control OS — a keyboard-first, dark-only command center for orchestrating agents, routing tasks between models, watching logs in real-time, inspecting memory/prompts, and tracking token/cost usage.
+AI Mission Control OS — a keyboard-first, dark-only command center for orchestrating agents, routing tasks between models, watching logs in real-time, and inspecting memory/prompts.
 
 **Reference sites:** Raycast (dense, keyboard-first), Linear (spacing/hierarchy), Vercel Dashboard (operational clarity), Notion (modular composition)
 
@@ -25,7 +25,6 @@ mission-control/
 │   ├── logs/page.tsx
 │   ├── memory/page.tsx
 │   ├── models/page.tsx
-│   ├── costs/page.tsx
 │   ├── settings/page.tsx
 │   ├── automations/page.tsx
 │   ├── claude/page.tsx    # Claude sessions viewer (paginated, 10/page)
@@ -103,8 +102,7 @@ The BUILD_PLAN.md defines 9 phases:
 6. Model Routing Surface
 7. Agents + Task Queue
 8. Logs + Memory Inspector
-9. Cost + Usage Analytics
-10. QA + Hardening
+9. QA + Hardening
 
 Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 
@@ -133,7 +131,7 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - Edit form (`EditTaskDialog`) pre-fills current values; submits PATCH `action:"update"` to `/api/tasks`
 
 ### Timeline / Activity Feed (`/timeline`) — T-001
-- Unified chronological feed of all activity (tasks, agents, sessions, costs)
+- Unified chronological feed of all activity (tasks, agents, sessions)
 - **DB:** `timeline_events` table (v3 migration in `src/server/db.ts`) — append-only, `INSERT OR IGNORE`
 - **Write path:** `recordEvent()` in `src/server/timeline.ts` — called from task store, agent activity log, and session scanner
 - **Event bus:** `src/runtime/timeline/eventsBus.ts` — in-memory pub/sub, same pattern as task events bus
@@ -217,6 +215,46 @@ Current state: Shell + primitives exist; tokens.css missing; layout.tsx bug.
 - **Keyboard:** `/` to search, `Tab` to switch views, `j/k` navigate list, `Esc` close detail
 - **Timeline integration:** Scan and delete events emit timeline events via `recordEvent()`
 
+### Office Presence (`/office`)
+- Real-time presence view for Jarvis, Cody, and Claudius with animated canvas
+- **Data sources:**
+  - Jarvis/Cody: Reads `~/.openclaw/agents/{main,cody}/sessions/sessions.json` directly (no DB)
+  - Claudius: Reads `~/.claude/sessions/*.json` — each file is `{PID}.json`; checks if PID is alive via `process.kill(pid, 0)`, uses file mtime for recency
+- **API:** `GET /api/office/presence` — returns `{jarvis: PresenceInfo, cody: PresenceInfo, claudius: PresenceInfo}`
+- **Session filtering (Jarvis/Cody):** Only considers direct/main sessions — excludes `:subagent:`, `:cron:`, `:run:`, `:slash:` keys
+- **State heuristics** (based on `updatedAt` age / file mtime):
+  - `thinking` — updated within last 30s (actively streaming tokens)
+  - `busy` — updated 30s–2min ago (in session, between turns)
+  - `idle` — no running direct session, or session stale >2min
+- **Claudius** represents active Claude Code coding runs (orange avatar). Walks to a desk PC when a session is active, returns to break room when idle.
+- **ViewModel:** `src/viewmodels/useOfficeViewModel.ts` — polls `/api/office/presence` every 5s
+- **Components:** `OfficeClient.tsx` (status bar with detail text), `OfficeCanvas.tsx` (animated canvas with 3 characters)
+- **Positions:** idle→break room sofa, thinking/busy→office desk
+- **Colors:** Jarvis=purple, Cody=emerald, Claudius=orange
+
+### Calendar (`/calendar`)
+- Month-view calendar showing timeline events and projected cron runs
+- **Data sources:** Timeline events (from `timeline_events` DB table) + Automations/crons (from `readAutomations()` LaunchAgent plist reader)
+- **API:** `GET /api/calendar?month=N&year=YYYY` — returns `CalendarResponse` with `CalendarDay[]`, each containing `CalendarItem[]`
+- **Cron projection:** Daily crons get one entry per day; interval-based crons get one summary entry per day
+- **Types:** `src/types/calendar.ts` — `CalendarItem`, `CalendarDay`, `CalendarResponse`, `CalendarItemSource`
+- **ViewModel:** `src/viewmodels/useCalendarViewModel.ts` — month/year navigation, cron filter toggle, fetch on month change
+- **Components:** `src/components/CalendarClient.tsx` — month grid (Mon–Sun), color-coded item dots (emerald=events, amber=crons), today highlight, overflow "+N more"
+- **Filter:** Toggle button hides/shows cron items (client-side filter on `source === "cron"`)
+- **Nav:** "Calendar" in AppShell sidebar + "Go to Calendar" (G C) in CommandPalette
+- **Assumptions:** No DB table — reads existing timeline_events + projects cron schedules. Future: could add user-created calendar entries.
+
+### Models (`/models`)
+- Dynamic model routing visualization backed by real `openclaw.json` config
+- **Data source:** `~/.openclaw/openclaw.json` — reads `models.providers` (full specs), `agents.defaults.model` (routing), `agents.list` (assignments), `auth.profiles` (providers)
+- **Server:** `src/server/routingReader.ts` — `getModelRoutingVisualization()` parses config, merges provider models + externally-referenced models, computes routing/assignment metadata
+- **API:** `GET /api/models` — returns `ModelRoutingVisualization`
+- **Types:** Defined in `src/server/routingReader.ts` — `ModelEntry`, `RoutingChainEntry`, `AgentModelAssignment`, `AuthProviderInfo`, `ModelRoutingVisualization`
+- **Components:** `src/components/ModelsClient.tsx` — routing flow diagram (primary + fallback chain + heartbeat), agent-to-model assignments, model cards (with specs or "external" label), auth provider list, all providers
+- **Model discovery:** Enumerates models from `models.providers[*].models[]` (with full cost/context specs) AND from `agents.defaults.models`, agent list, primary/fallbacks/heartbeat (as external models without specs if not in providers)
+- **Model cards show:** cost per 1M tokens (in/out + cache read/write), context window, reasoning flag, primary/fallback badges, assigned agent badges
+- **No hardcoded data** — all content derived from config at request time
+
 ### Design Tokens Color Scheme
 - Core colors use blue-ish hues (hue ~225-235) for bg, surface, and borders
 - Glass-panel class uses `--mc-surface-elevated` and `--mc-border` with blue hues
@@ -227,7 +265,7 @@ The dashboard at `app/page.tsx` → `DashboardClient` composes all subsystem wid
 - **Layout sections:** Hero header → Key metrics (4 MetricCards with `glass-panel accent-glow`) → Subsystems (3-col grid) → Operations (2-col grid) → Situation (3-col alerts/logs/actions)
 - **Subsystem widgets:** `TimelineWidget`, `ApprovalsWidget`, `RetriesWidget`, `TasksWidget`, `MemoryWidget`, Token & cost summary — all in a responsive 3-col grid
 - **TasksWidget** (`src/components/TasksWidget.tsx`): Shows lane counts (now/next/review/blocked/done) with color-coded grid; links to `/tasks`
-- **Operator quick actions** are now `<Link>` components routing to `/agents`, `/tasks`, `/models`, `/costs`, `/approvals`
+- **Operator quick actions** are now `<Link>` components routing to `/agents`, `/tasks`, `/models`, `/approvals`
 - **Data flow:** `app/page.tsx` (server) fetches from runtime adapter, timeline, approvals, retries, memory, and task store; passes all to `DashboardClient` (client) which uses `useDashboardRuntime` (SSE/polling) for live updates
 - **Glass styling:** MetricCards use `glass-panel accent-glow`; operational panels use default `Panel` card styling
 

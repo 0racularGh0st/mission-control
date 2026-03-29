@@ -1,6 +1,6 @@
 // Timeline event types — shared across client and server
 
-export type TimelineSource = "tasks" | "agents" | "sessions" | "costs";
+export type TimelineSource = "tasks" | "agents" | "sessions";
 
 export type TimelineEventType =
   | "task.created"
@@ -24,7 +24,7 @@ export type TimelineEventType =
   | "memory.scanned"
   | "memory.deleted";
 
-export const TIMELINE_SOURCES: TimelineSource[] = ["tasks", "agents", "sessions", "costs"];
+export const TIMELINE_SOURCES: TimelineSource[] = ["tasks", "agents", "sessions"];
 
 export interface TimelineEvent {
   id: string;

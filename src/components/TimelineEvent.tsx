@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CheckSquare, DollarSign, Terminal } from "lucide-react";
+import { Bot, CheckSquare, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TimelineEvent as TimelineEventType, TimelineSource } from "@/src/types/timeline";
 
@@ -8,14 +8,12 @@ const SOURCE_ICONS: Record<TimelineSource, React.ReactNode> = {
   tasks: <CheckSquare className="h-3.5 w-3.5" />,
   agents: <Bot className="h-3.5 w-3.5" />,
   sessions: <Terminal className="h-3.5 w-3.5" />,
-  costs: <DollarSign className="h-3.5 w-3.5" />,
 };
 
 const SOURCE_COLORS: Record<TimelineSource, string> = {
   tasks: "text-blue-400",
   agents: "text-emerald-400",
   sessions: "text-violet-400",
-  costs: "text-amber-400",
 };
 
 function formatTimestamp(iso: string): string {

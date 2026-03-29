@@ -281,7 +281,7 @@ export function scanAndIngestSessions(): { ingested: number; skipped: number; to
 
       // Cost spike detection for sessions
       if (s.costUsd > 0.10) {
-        recordEvent("cost.spike", "costs", s.sessionId, s.model,
+        recordEvent("cost.spike", "sessions", s.sessionId, s.model,
           `Cost spike: $${s.costUsd.toFixed(2)} on session (${s.project})`,
           JSON.stringify({ cost: s.costUsd, threshold: 0.10, project: s.project }));
       }

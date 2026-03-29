@@ -65,7 +65,7 @@ export function updateActivityStatus(
 
     // Cost spike detection: emit cost.spike if session cost > $0.10
     if (updates.estimatedCostUsd !== undefined && updates.estimatedCostUsd > 0.10) {
-      recordEvent("cost.spike", "costs", sessionKey, "system",
+      recordEvent("cost.spike", "sessions", sessionKey, "system",
         `Cost spike: $${updates.estimatedCostUsd.toFixed(2)} on agent session`,
         JSON.stringify({ cost: updates.estimatedCostUsd, threshold: 0.10 }));
     }
