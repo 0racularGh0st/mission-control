@@ -1,15 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { CalendarDay, CalendarResponse } from "@/src/types/calendar";
-
-export interface CalendarState {
-  days: CalendarDay[];
-  month: number;
-  year: number;
-  loading: boolean;
-  error: string | null;
-}
 
 export function useCalendarViewModel() {
   const now = new Date();
@@ -18,7 +10,6 @@ export function useCalendarViewModel() {
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCrons, setShowCrons] = useState(true);
 
   const fetchCalendar = useCallback(async (m: number, y: number) => {
     setLoading(true);
@@ -57,22 +48,12 @@ export function useCalendarViewModel() {
     }
   }, [month]);
 
-  const filteredDays = useMemo(() => {
-    if (showCrons) return days;
-    return days.map((day) => ({
-      ...day,
-      items: day.items.filter((item) => item.source !== "cron"),
-    }));
-  }, [days, showCrons]);
-
   return {
     month,
     year,
-    days: filteredDays,
+    days,
     loading,
     error,
-    showCrons,
-    setShowCrons,
     prevMonth,
     nextMonth,
   };

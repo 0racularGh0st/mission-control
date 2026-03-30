@@ -36,9 +36,6 @@ const MAIN_OFFICE_DESK_X = 160;
 const MAIN_OFFICE_DESK_Y = 180;
 const BREAK_ROOM_SOFA_X = 560;
 const BREAK_ROOM_SOFA_Y = 280;
-// Second desk for Claudius (row 2, middle desk)
-const DESK2_X = 220;
-const DESK2_Y = 280;
 // Thinking position — at the whiteboard area between desk and sofa
 const THINKING_X = 360;
 const THINKING_Y = 220;
@@ -111,14 +108,14 @@ export function useOfficeViewModel() {
             targetY: cp.state === "busy" ? MAIN_OFFICE_DESK_Y + 60 : cp.state === "thinking" ? THINKING_Y + 40 : BREAK_ROOM_SOFA_Y + 40,
           };
 
-          // Claudius position based on state — uses middle desk (row 2)
+          // Claudius position based on state — row 2 right desk when active, break room when idle
           if (cl) {
             next.claudius = {
               ...prev.claudius,
               state: cl.state,
               detail: cl.detail,
-              targetX: cl.state === "busy" ? DESK2_X : cl.state === "thinking" ? DESK2_X : BREAK_ROOM_SOFA_X + 60,
-              targetY: cl.state === "busy" ? DESK2_Y : cl.state === "thinking" ? DESK2_Y : BREAK_ROOM_SOFA_Y + 20,
+              targetX: cl.state === "busy" || cl.state === "thinking" ? MAIN_OFFICE_DESK_X + 200 : BREAK_ROOM_SOFA_X + 60,
+              targetY: cl.state === "busy" || cl.state === "thinking" ? MAIN_OFFICE_DESK_Y + 80 : BREAK_ROOM_SOFA_Y + 20,
             };
           }
 
@@ -135,18 +132,35 @@ export function useOfficeViewModel() {
     return () => clearInterval(interval);
   }, []);
 
-  // Tick animation frames
+  // Tick animation frames + move positions toward targets
   useEffect(() => {
     let frame: number;
     let lastTime = 0;
+    const LERP_SPEED = 0.08;
+
+    function lerpPos(current: number, target: number): number {
+      const diff = target - current;
+      if (Math.abs(diff) < 0.5) return target;
+      return current + diff * LERP_SPEED;
+    }
+
+    function stepAgent(agent: AgentPosition): AgentPosition {
+      return {
+        ...agent,
+        x: lerpPos(agent.x, agent.targetX),
+        y: lerpPos(agent.y, agent.targetY),
+        animFrame: (agent.animFrame + 1) % 8,
+      };
+    }
+
     function tick(time: number) {
       if (time - lastTime > 100) {
         lastTime = time;
         setState((prev) => ({
           ...prev,
-          jarvis: { ...prev.jarvis, animFrame: (prev.jarvis.animFrame + 1) % 8 },
-          cody: { ...prev.cody, animFrame: (prev.cody.animFrame + 1) % 8 },
-          claudius: { ...prev.claudius, animFrame: (prev.claudius.animFrame + 1) % 8 },
+          jarvis: stepAgent(prev.jarvis),
+          cody: stepAgent(prev.cody),
+          claudius: stepAgent(prev.claudius),
         }));
       }
       frame = requestAnimationFrame(tick);

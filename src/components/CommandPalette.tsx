@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Activity, Bot, Building2, CalendarDays, Home, ListTodo, Logs, MemoryStick, RotateCcw, Search, Settings, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { Activity, Bot, Building2, CalendarDays, Home, ListTodo, Logs, MemoryStick, RotateCcw, Settings, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 
 type CommandEntry = {
   id: string;
@@ -125,18 +125,6 @@ export function CommandPalette() {
       icon: <Settings className="size-4" />,
       action: () => { router.push("/settings"); setOpen(false); },
       group: "Navigation",
-    },
-    {
-      id: "inspect-run",
-      label: "Inspect Run",
-      shortcut: "G I",
-      icon: <Search className="size-4" />,
-      action: () => {
-        // Dispatch event for inspector toggle
-        window.dispatchEvent(new CustomEvent("toggle-inspector"));
-        setOpen(false);
-      },
-      group: "Actions",
     },
   ];
 

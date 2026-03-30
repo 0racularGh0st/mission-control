@@ -6,13 +6,9 @@ import { usePathname } from "next/navigation";
 import { CommandPalette } from "@/src/components/CommandPalette";
 import { ApprovalsBadge } from "@/src/components/ApprovalsBadge";
 import { RetriesBadge } from "@/src/components/RetriesBadge";
-import { InspectorPanel } from "@/src/components/InspectorPanel";
-import { useInspector } from "@/src/runtime/inspector/context";
-
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/src/components/primitives/CommandBar";
 import { JarvisLogo } from "@/src/components/primitives/JarvisLogo";
-import { Panel } from "@/src/components/primitives/Panel";
 
 const navItems = [
   { label: "Dashboard", href: "/" },
@@ -33,12 +29,11 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const inspector = useInspector();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <CommandPalette />
-      <div className="mx-auto grid min-h-screen w-full max-w-[1600px] grid-cols-1 gap-3 p-3 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1600px] grid-cols-1 gap-3 p-3 xl:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="glass-panel sticky top-0 hidden rounded-xl p-3 xl:block h-fit">
           <div className="mb-3 flex items-center gap-2 px-2 py-1">
             <JarvisLogo size={24} />
@@ -99,24 +94,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="min-h-0 flex-1">{children}</main>
         </div>
 
-        <aside className="hidden xl:block">
-          <Panel
-            className="h-full"
-            title="Inspector"
-            description={inspector.isOpen && inspector.data
-              ? `${inspector.data.meta.source} · ${inspector.data.meta.model}`
-              : "Context panel for selected entities and quick metadata."}
-          >
-            <InspectorPanel
-              data={inspector.data}
-              loading={inspector.loading}
-              error={inspector.error}
-              selectedMessageIndex={inspector.selectedMessageIndex}
-              onSelectMessage={inspector.selectMessage}
-              onClose={inspector.close}
-            />
-          </Panel>
-        </aside>
       </div>
     </div>
   );

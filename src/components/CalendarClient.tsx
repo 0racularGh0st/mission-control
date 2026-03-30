@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useCalendarViewModel } from "@/src/viewmodels/useCalendarViewModel";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Timer, Activity } from "lucide-react";
+import { ChevronLeft, ChevronRight, Timer } from "lucide-react";
 import type { CalendarItem, CalendarDay } from "@/src/types/calendar";
 import {
   Dialog,
@@ -20,19 +20,25 @@ const MONTH_NAMES = [
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/** Format an ISO date string's time portion as "7:00 AM" */
+function formatTime(isoDate: string): string {
+  const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 function ItemDot({ item }: { item: CalendarItem }) {
-  const isCron = item.source === "cron";
+  const time = formatTime(item.date);
   return (
     <div
-      className={cn(
-        "truncate rounded px-1 py-0.5 text-[10px] leading-tight",
-        isCron
-          ? "bg-amber-500/20 text-amber-400"
-          : "bg-accent/20 text-emerald-400",
-      )}
-      title={`${item.title}${item.detail ? ` — ${item.detail}` : ""}`}
+      className="truncate rounded px-1 py-0.5 text-[10px] leading-tight bg-amber-500/20 text-amber-400"
+      title={`${time ? time + " — " : ""}${item.title}${item.detail ? ` — ${item.detail}` : ""}`}
     >
-      {item.title}
+      {time ? `${time} ${item.title}` : item.title}
     </div>
   );
 }
@@ -65,31 +71,27 @@ function DayModal({
           </DialogDescription>
         </DialogHeader>
         {sorted.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">No events for this day.</p>
+          <p className="text-sm text-muted-foreground py-2">No scheduled items for this day.</p>
         ) : (
           <div className="flex flex-col gap-1 max-h-[360px] overflow-y-auto -mx-1 px-1">
-            {sorted.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onSelectItem(item)}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/60",
-                  item.source === "cron"
-                    ? "text-amber-400"
-                    : "text-emerald-400",
-                )}
-              >
-                {item.source === "cron" ? (
+            {sorted.map((item) => {
+              const time = formatTime(item.date);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectItem(item)}
+                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/60 text-amber-400"
+                >
                   <Timer className="size-3.5 shrink-0" />
-                ) : (
-                  <Activity className="size-3.5 shrink-0" />
-                )}
-                <span className="truncate">{item.title}</span>
-                <span className="ml-auto text-[11px] text-muted-foreground shrink-0">
-                  {item.kind}
-                </span>
-              </button>
-            ))}
+                  {time && (
+                    <span className="text-[11px] text-muted-foreground shrink-0 min-w-[65px]">
+                      {time}
+                    </span>
+                  )}
+                  <span className="truncate">{item.title}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </DialogContent>
@@ -106,43 +108,39 @@ function ItemDetailModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const isCron = item.source === "cron";
+  const time = formatTime(item.date);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isCron ? (
-              <Timer className="size-4 text-amber-400" />
-            ) : (
-              <Activity className="size-4 text-emerald-400" />
-            )}
+            <Timer className="size-4 text-amber-400" />
             {item.title}
           </DialogTitle>
-          <DialogDescription>{item.kind}</DialogDescription>
+          <DialogDescription>{item.detail}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="font-medium text-foreground">Source:</span>
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 text-xs",
-                isCron ? "bg-amber-500/20 text-amber-400" : "bg-accent/20 text-emerald-400",
-              )}
-            >
-              {item.source}
+            <span className="font-medium text-foreground">Schedule:</span>
+            <span className="rounded px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-400">
+              {item.detail}
             </span>
           </div>
+          {time && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="font-medium text-foreground">Time:</span>
+              {time}
+            </div>
+          )}
           <div className="flex items-center gap-2 text-muted-foreground">
             <span className="font-medium text-foreground">Date:</span>
-            {item.date}
-          </div>
-          <div>
-            <span className="font-medium text-foreground">Detail:</span>
-            <p className="mt-1 text-muted-foreground whitespace-pre-wrap">
-              {item.detail || "No info available"}
-            </p>
+            {new Date(item.date).toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
           </div>
         </div>
       </DialogContent>
@@ -157,8 +155,6 @@ export function CalendarClient() {
     days,
     loading,
     error,
-    showCrons,
-    setShowCrons,
     prevMonth,
     nextMonth,
   } = useCalendarViewModel();
@@ -177,7 +173,7 @@ export function CalendarClient() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Header: nav + filter */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
@@ -199,29 +195,9 @@ export function CalendarClient() {
           </button>
         </div>
 
-        <button
-          onClick={() => setShowCrons(!showCrons)}
-          className={cn(
-            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors",
-            showCrons
-              ? "bg-amber-500/20 text-amber-400"
-              : "bg-muted/40 text-muted-foreground",
-          )}
-        >
-          <Timer className="size-3" />
-          {showCrons ? "Crons visible" : "Crons hidden"}
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <Activity className="size-3 text-emerald-400" />
-          Events
-        </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Timer className="size-3 text-amber-400" />
-          Crons
+          Scheduled
         </span>
       </div>
 
@@ -293,7 +269,7 @@ export function CalendarClient() {
         </>
       )}
 
-      {/* Day modal — all events for a clicked date */}
+      {/* Day modal — all items for a clicked date */}
       {selectedDay && (
         <DayModal
           day={selectedDay}

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/src/server/db";
 import { readAutomations } from "@/src/server/automationReader";
+import { readCronJobs, projectCronRuns } from "@/src/server/cronJobsReader";
 import type { CalendarDay, CalendarItem, CalendarResponse } from "@/src/types/calendar";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/calendar?month=3&year=2026
- * Returns timeline events + projected cron runs for the given month.
+ * Returns projected cron/scheduled runs for the given month.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,52 +20,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid month/year" }, { status: 400 });
     }
 
-    // Date range for the month
-    const startDate = new Date(year, month - 1, 1).toISOString();
-    const endDate = new Date(year, month, 1).toISOString();
     const daysInMonth = new Date(year, month, 0).getDate();
 
-    // 1. Fetch timeline events for this month, aggregated by day + event_type
-    const db = getDb();
-    const aggRows = db
-      .prepare(
-        `SELECT substr(occurred_at, 1, 10) AS day_key,
-                event_type,
-                COUNT(*) AS cnt,
-                MIN(occurred_at) AS first_at
-         FROM timeline_events
-         WHERE occurred_at >= ? AND occurred_at < ?
-         GROUP BY day_key, event_type
-         ORDER BY day_key, first_at`,
-      )
-      .all(startDate, endDate) as {
-      day_key: string;
-      event_type: string;
-      cnt: number;
-      first_at: string;
-    }[];
-
-    // Index aggregated items by day
     const dayMap = new Map<string, CalendarItem[]>();
 
-    for (const row of aggRows) {
-      const items = dayMap.get(row.day_key) ?? [];
-      const label =
-        row.cnt === 1
-          ? row.event_type.replace(".", " ")
-          : `${row.cnt} ${row.event_type.replace(".", " ")} events`;
-      items.push({
-        id: `agg-${row.day_key}-${row.event_type}`,
-        title: label,
-        date: row.first_at,
-        source: "timeline",
-        detail: `${row.cnt} event${row.cnt !== 1 ? "s" : ""}`,
-        kind: row.event_type,
-      });
-      dayMap.set(row.day_key, items);
-    }
-
-    // 2. Project cron runs onto calendar days
+    // Project cron runs onto calendar days
     const automations = await readAutomations();
     for (const auto of automations) {
       if (auto.status !== "active") continue;
@@ -104,7 +63,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Build ordered day array
+    // Project openclaw cron jobs (agent-scheduled: market updates, daily tasks, etc.)
+    const cronJobs = await readCronJobs();
+    const cronRuns = projectCronRuns(cronJobs, month, year);
+    for (const run of cronRuns) {
+      const items = dayMap.get(run.date) ?? [];
+      items.push({
+        id: `cron-${run.jobId}-${run.date}`,
+        title: run.description || run.name,
+        date: `${run.date}T${run.time}:00`,
+        source: "cron",
+        detail: run.scheduleLabel,
+        kind: run.scheduleLabel,
+      });
+      dayMap.set(run.date, items);
+    }
+
+    // Build ordered day array
     const days: CalendarDay[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dayStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
